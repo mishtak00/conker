@@ -209,13 +209,12 @@ def main():
 	cf2.cleanup()
 
 	W = fftconvolve(W1, W2, mode='same')
-	savename = 'out_xcor_{}_{}/'.format(filename1, filename2)
+	savename = 'out_xcorr_{}_{}/'.format(filename1, filename2)
 	try:
 		os.mkdir(savename)
 	except FileExistsError:
 		pass
-	np.save(savename + f'W_r1_{args.kernel_radius1}_t1_{args.vote_threshold1}'
-		'_r2_{args.kernel_radius2}_t2_{args.vote_threshold2}.npy', W)
+	np.save(savename + f'W_r1_{args.kernel_radius1}_r2_{args.kernel_radius2}.npy', W)
 
 	# subprocess.run(['python','cfdriver.py',args.file1,'-r1', args.kernel_radius1])
 
