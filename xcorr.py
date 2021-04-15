@@ -257,7 +257,7 @@ def main():
 	import matplotlib.pyplot as plt
 	plt.plot(separation, correlation)
 	plt.savefig(f'conker_scan_{separation[0]}_{separation[-1]}.png')
-	plt.show()
+	# plt.show()
 
 	# subprocess.run(['python','cfdriver.py',args.file1,'-r1', args.kernel_radius1])
 
