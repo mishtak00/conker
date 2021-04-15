@@ -201,7 +201,8 @@ class Kernel:
 			kernel_r_idx_units, circumscribed_r_idx_units,\
 			kernel_bin_count, kernel_center_idx, kernel_center = self._calculate_settings_custom(func)
 			# pads function with 0s from the user-fed radius to the circurmscribed radius
-			func = np.array([func[i] if i<kernel_r_idx_units else 0 for i in range(circumscribed_r_idx_units)])
+			func = np.array([func[i] if i<kernel_r_idx_units else 0 
+				for i in range(circumscribed_r_idx_units)])
 		elif self.type=='ball':
 			# forms a filled-sphere kernel
 			kernel_r_idx_units = int(np.ceil(self.radius / self.grid_spacing))
@@ -212,7 +213,8 @@ class Kernel:
 			_, circumscribed_r_idx_units,\
 			kernel_bin_count, kernel_center_idx, kernel_center = self._calculate_settings_custom(func)
 			# pads function with 0s from the user-fed radius to the circurmscribed radius
-			func = np.array([func[i] if i<kernel_r_idx_units else 0 for i in range(circumscribed_r_idx_units)])
+			func = np.array([func[i] if i<kernel_r_idx_units else 0 
+				for i in range(circumscribed_r_idx_units)])
 
 		if self.printout:
 			print('Kernel radius in index units:', kernel_r_idx_units)
