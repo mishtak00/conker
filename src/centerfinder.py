@@ -59,6 +59,11 @@ class CenterFinder():
 
 		self.G_radii = self.LUT_radii(self.G_redshift)
 
+		self.background = None
+		self.density_grid = None
+		self.density_grid_edges = None
+		self.centers_grid = None
+
 
 
 	def __str__(self):
@@ -109,9 +114,10 @@ class CenterFinder():
 
 		# makes expected grid and subtracts it from the density grid
 		if dencon[0]:
-			background = self._project_and_sample(self.density_grid, self.density_grid_edges)
-			self.density_grid -= background
-			del background
+			if not self.background:
+				self.set_background(self._project_and_sample(self.density_grid, self.density_grid_edges))
+			self.density_grid -= self.get_background()
+			# del background
 			# keep or discard negative valued weights
 			# dencon[1] set to True means keep negative weights
 			if not dencon[1]:
@@ -145,7 +151,7 @@ class CenterFinder():
 		# this scans the kernel over the whole volume of the galaxy density grid
 		# calculates the tensor inner product of the two at each step
 		# and finally stores this value as the number of voters per that bin in the centers grid
-		self.centers_grid = fftconvolve(density_grid, kernel.get_grid(), mode='same')
+		self.centers_grid = fftconvolve(self.density_grid, kernel.get_grid(), mode='same')
 		
 		if self.printout:
 			print('Voting procedure completed successfully...')
@@ -330,15 +336,28 @@ class CenterFinder():
 		del self.kernel_radius
 
 
+	def set_background(self, bg):
+		""" DO NOT SET IF GONNA MUTATE """
+		""" TODO: check that it sets class variable by 
+		reference and not a deep copy """
+		self.background = bg
+
+
+	def get_background(self):
+		return self.background
+
+
+	def set_density_grid(self, dg):
+		""" DO NOT SET IF GONNA MUTATE """
+		self.density_grid = dg
+
 
 	def get_density_grid(self, dencon: bool, overden: bool):
 		self._make_density_grid(dencon=dencon, overden=overden)
 
 
-
 	def make_convolved_grid(self):
 		self._convolve()
-
 
 
 	def find_centers(self, dencon: bool, overden: bool, cleanup: bool = True):

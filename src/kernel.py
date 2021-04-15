@@ -206,7 +206,9 @@ class Kernel:
 			# forms a filled-sphere kernel
 			kernel_r_idx_units = int(np.ceil(self.radius / self.grid_spacing))
 			func = np.ones(kernel_r_idx_units)
-			func /= len(custom_func)
+			func /= len(func)
+			kernel_r_idx_units_lower_bound = 0
+			kernel_r_idx_units_upper_bound = len(func)
 			_, circumscribed_r_idx_units,\
 			kernel_bin_count, kernel_center_idx, kernel_center = self._calculate_settings_custom(func)
 			# pads function with 0s from the user-fed radius to the circurmscribed radius

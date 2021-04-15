@@ -167,7 +167,13 @@ def main():
 		do_dencon2 = False
 		keep_neg_wts2 = False
 	dencon_args2 = (do_dencon2, keep_neg_wts2)
+
 	cf2.get_density_grid(dencon=dencon_args2, overden=args.overdensity2)
+	# if self-correlation, keeps background so it calculates it only once
+	if not args.matter_tracer_file_2:
+		# TODO: make these into instance variables of CF object
+		density_grid = cf2.density_grid
+		# background = cf2.background
 	cf2.make_convolved_grid()
 	W2 = cf2.centers_grid
 	del cf2
@@ -202,7 +208,13 @@ def main():
 		do_dencon1 = False
 		keep_neg_wts1 = False
 	dencon_args1 = (do_dencon1, keep_neg_wts1)
-	cf1.get_density_grid(dencon=dencon_args1, overden=args.overdensity1)
+	# doesn't recalculate background and density grid
+	if not args.matter_tracer_file_2:
+		cf1.set_density_grid(density_grid)
+		# cf1.set_background(background)
+		del density_grid#, background
+	else:
+		cf1.get_density_grid(dencon=dencon_args1, overden=args.overdensity1)
 
 
 	savename = 'out_xcorr_{}_{}/'.format(filename1, filename2)
@@ -213,7 +225,7 @@ def main():
 
 	if args.scan:
 		start, end = args.scan
-		corrfunc = {r:0 for r in range(start,end,5)}
+		corrfunc = {r:None for r in range(start,end,5)}
 
 		for r in corrfunc.keys():
 			cf1.set_kernel_radius(r)
@@ -222,7 +234,7 @@ def main():
 			cf1.cleanup()
 
 			W = W1 * W2
-			np.save(savename + f'W_r1_{args.kernel_radius1}_r2_{args.kernel_radius2}.npy', W)
+			np.save(savename + f'W_r1_{r}_r2_{args.kernel_radius2}.npy', W)
 
 			corrfunc[r] = np.sum(W)
 
@@ -237,9 +249,14 @@ def main():
 		np.save(savename + f'W_r1_{args.kernel_radius1}_r2_{args.kernel_radius2}.npy', W)
 
 
+	separation, correlation = list(corrfunc.keys()), list(corrfunc.values())
+	print(separation)
+	print(correlation)
+	np.save(savename + f'separation_range_{separation[0]}_{separation[-1]}.npy', separation)
+	np.save(savename + f'correlation_range_{separation[0]}_{separation[-1]}.npy', correlation)
 	import matplotlib.pyplot as plt
-	plt.plot(corrfunc.keys(), corrfunc.values())
-	plt.savefig(f'conker_scan_{corrfunc.keys()[0]}_{corrfunc.keys()[-1]}')
+	plt.plot(separation, correlation)
+	plt.savefig(f'conker_scan_{separation[0]}_{separation[-1]}.png')
 	plt.show()
 
 	# subprocess.run(['python','cfdriver.py',args.file1,'-r1', args.kernel_radius1])
