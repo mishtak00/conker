@@ -90,8 +90,7 @@ class CenterFinder():
 
 
 
-	def _vote(self, dencon: tuple = (False, False), overden: bool = False, 
-		premade_kernel: np.ndarray = None):
+	def _make_density_grid(self, dencon: tuple = (False, False), overden: bool = False):
 
 		xyzs = sky2cartesian(self.G_ra, self.G_dec, self.G_redshift, self.LUT_radii) # galaxy x, y and z coordinates
 		self.galaxies_cartesian = np.array(xyzs).T  # each galaxy is represented by (x, y, z)
@@ -101,54 +100,47 @@ class CenterFinder():
 									for i in range(len(xyzs))], dtype=int)
 
 		# histograms the data points in real space with given weights
-		density_grid, self.density_grid_edges = np.histogramdd(self.galaxies_cartesian, 
+		self.density_grid, self.density_grid_edges = np.histogramdd(self.galaxies_cartesian, 
 			bins=bin_counts_3d, weights=self.G_weights)
 
 		if self.printout:
 			print('Histogramming completed successfully...')
-			print('Density grid shape:', density_grid.shape)
+			print('Density grid shape:', self.density_grid.shape)
 
 		# makes expected grid and subtracts it from the density grid
 		if dencon[0]:
-			background = self._project_and_sample(density_grid, self.density_grid_edges)
-			density_grid -= background
+			background = self._project_and_sample(self.density_grid, self.density_grid_edges)
+			self.density_grid -= background
 			del background
 			# keep or discard negative valued weights
 			# dencon[1] set to True means keep negative weights
 			if not dencon[1]:
 				if self.printout:
 					print('Discarding all negative weights in density grid...')
-				density_grid[density_grid < 0.] = 0.
+				self.density_grid[self.density_grid < 0.] = 0.
 			if self.printout:
 				print('Background subtraction completed successfully...')
 		
 		# calculates avg density of all nonempty grid cells of the 
 		# weighted density field and subtracts it from the density field
 		elif overden:
-			denavg = np.average(density_grid[density_grid!=0])
-			density_grid[density_grid!=0] -= denavg
-			density_grid[density_grid!=0] /= denavg
+			denavg = np.average(self.density_grid[self.density_grid!=0])
+			self.density_grid[self.density_grid!=0] -= denavg
+			self.density_grid[self.density_grid!=0] /= denavg
 			if self.printout:
 				print('Overdensity calculation completed successfully...')
 
 		if self.printout:
 			print('Minimum and maximum values of density field grid cells: '\
-				'[{}, {}]'.format(density_grid.min(), density_grid.max()))
+				'[{}, {}]'.format(self.density_grid.min(), self.density_grid.max()))
 
-		if premade_kernel is None:
-			# makes the kernel for scanning over the density grid
-			kernel = Kernel(self.kernel_type, self.kernel_radius, self.grid_spacing,
-				self.printout, self.show_kernel, *self.kernel_args)
-			# for refinement process, the following allows kernel jittering
-			# box around each center is 5% larger than the kernel outer radius
-			self.centerbox_r_upper_bound_idx_units = np.round(kernel.\
-				kernel_r_idx_units_upper_bound*1.05)
-		# sets kernel for the refinement process
-		else:
-			kernel = premade_kernel
 
-		# TODO: for refinement DEV ONLY
-		self.density_grid = density_grid
+
+	def _convolve(self):
+	
+		# makes the kernel for scanning over the density grid
+		kernel = Kernel(self.kernel_type, self.kernel_radius, self.grid_spacing,
+			self.printout, self.show_kernel, *self.kernel_args)
 
 		# this scans the kernel over the whole volume of the galaxy density grid
 		# calculates the tensor inner product of the two at each step
@@ -334,8 +326,19 @@ class CenterFinder():
 
 
 	def cleanup(self):
-		delattr(self, 'centers_grid')
-		delattr(self, 'density_grid_edges')
+		del self.centers_grid
+		del self.kernel_radius
+
+
+
+	def get_density_grid(self, dencon: bool, overden: bool):
+		self._make_density_grid(dencon=dencon, overden=overden)
+
+
+
+	def make_convolved_grid(self):
+		self._convolve()
+
 
 
 	def find_centers(self, dencon: bool, overden: bool, cleanup: bool = True):
@@ -347,10 +350,11 @@ class CenterFinder():
 		if self.printout:
 			print(self)
 
-		self._vote(dencon=dencon, overden=overden)
+		self._make_density_grid(dencon=dencon, overden=overden)
+		self._convolve()
 		
 		# TODO: clean this up
-		self.centers_grid[self.centers_grid < self.vote_threshold] = 0
+		# self.centers_grid[self.centers_grid < self.vote_threshold] = 0
 		self.centers_indices = np.asarray(self.centers_grid >= self.vote_threshold).nonzero()
 		self.C_weights = self.centers_grid[self.centers_indices]
 		if self.printout:
@@ -379,57 +383,7 @@ class CenterFinder():
 
 
 
-	"""
-	DEV IN PROGRESS
-	"""
-	def refine_centers(self, refinement_args):
-		"""
-		Refines the locations of found centers.
-		"""
 
-		kernel_type = refinement_args[0]
-		kernel_args = [float(refinement_args[1])]
-		# grid_spacing = refinement_args[2]
-
-		# makes the kernel for scanning over the density grid
-		# kernel_grid = self._kernel()
-		kernel = Kernel(kernel_type, self.kernel_radius, self.grid_spacing,
-			self.printout, self.show_kernel, *kernel_args)
-
-		# for refinement process, the following allows kernel jittering
-		# box around each center is 10% larger than the kernel outer radius
-		self.centerbox_r_upper_bound_idx_units = int(np.round(kernel.\
-			kernel_r_idx_units_upper_bound*1.1))
-
-
-		# print(self.centers_indices)
-
-		for idxs in zip(*self.centers_indices):
-
-			# note down original indexes because will have to do a coord
-			# translation in the end after the convolution
-
-			# print(idxs)
-
-			# need the box of galaxies around this center
-			# these calculations deal with edge cases
-			(xlo,xhi),(ylo,yhi),(zlo,zhi) = tuple(
-			(max(0, idxs[i]-self.centerbox_r_upper_bound_idx_units), 
-			min(idxs[i]+self.centerbox_r_upper_bound_idx_units, self.density_grid.shape[i]))
-			for i in range(len(idxs)))
-
-			# print(centerbox_bounds_idx_units)
-			# print(xlo,xhi,ylo,yhi,zlo,zhi)
-
-			densitybox = self.density_grid[xlo:xhi,ylo:yhi,zlo:zhi]
-			# print(densitybox.shape)
-
-			centerbox = np.round(fftconvolve(densitybox, kernel.get_grid(), mode='same'))
-
-			# print(centerbox.shape)
-
-
-			# break
 
 
 

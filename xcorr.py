@@ -118,6 +118,9 @@ def main():
 		help='Grids and .fits output will be automatically saved to an \'out\' folder.')
 	parser.add_argument('-v', '--verbose', action='store_true', 
 		help='The progress of CenterFinder will be printed out to standard output.')
+	parser.add_argument('--scan', nargs=2, type=int,
+		help='Calculates correlation function from 1st arg (iclusive) '
+				'to 2nd arg (exclusive) by step of grid_spacing.')
 
 	args = parser.parse_args()
 
@@ -132,63 +135,25 @@ def main():
 		filename2 = '.'.join(args.matter_tracer_file_2.split('.')[:-1])
 	else:
 		filename2 = filename1
-	# try:
-	# 	os.mkdir('out_ball_{}'.format(filename2))
-	# except FileExistsError:
-	# 	pass
 
-	# creates and customizes instance of 1st CenterFinder object
-	cf1 = CenterFinder(args.file1, args.weighted_input1, 
-		args.params_file, args.save, args.verbose)
-	if args.kernel_radius1 is not None:
-		cf1.set_kernel_radius(args.kernel_radius1)
-	if args.show_kernel1:
-		cf1.set_show_kernel(args.show_kernel1)
-	if args.step_kernel1 is not None:
-		cf1.set_kernel_type('step', args.step_kernel1)
-	elif args.gaussian_kernel1 is not None:
-		cf1.set_kernel_type('gaussian', args.gaussian_kernel1)
-	elif args.wavelet_kernel1 is not None:
-		cf1.set_kernel_type('wavelet', args.wavelet_kernel1)
-	elif args.custom_kernel1 is not None:
-		cf1.set_kernel_type('custom', args.custom_kernel1)
-	if args.vote_threshold1 is not None:
-		cf1.set_vote_threshold(args.vote_threshold1)
-
-	# runs the centerfinding algorithm
-	if args.density_contrast1 is not None:
-		do_dencon1 = True
-		if len(args.density_contrast1)==0:
-			keep_neg_wts1 = True
-		else:
-			keep_neg_wts1 = False
-	else:
-		do_dencon1 = False
-		keep_neg_wts1 = False
-	dencon_args1 = (do_dencon1, keep_neg_wts1)
-	cf1.find_centers(dencon=dencon_args1,
-					overden=args.overdensity1,
-					cleanup=False)
-	W1 = cf1.centers_grid
-	cf1.cleanup()
 
 	# creates and customizes instance of 2nd CenterFinder object
-	file2 = args.matter_tracer_file_2 if args.matter_tracer_file_2 else args.file1
+	file2 = args.file1 if not args.matter_tracer_file_2 else args.matter_tracer_file_2
 	cf2 = CenterFinder(file2, args.weighted_input2, 
-		args.params_file, args.save, args.verbose)
-	if args.kernel_radius2 is not None:
+		args.params_file, args.save, args.verbose, kernel_type='ball')
+	if args.kernel_radius2:
 		cf2.set_kernel_radius(args.kernel_radius2)
 	if args.show_kernel2:
 		cf2.set_show_kernel(args.show_kernel2)
-	if args.step_kernel2 is not None:
+	if args.step_kernel2:
 		cf2.set_kernel_type('step', args.step_kernel2)
-	elif args.gaussian_kernel2 is not None:
+	elif args.gaussian_kernel2:
 		cf2.set_kernel_type('gaussian', args.gaussian_kernel2)
-	elif args.wavelet_kernel2 is not None:
+	elif args.wavelet_kernel2:
 		cf2.set_kernel_type('wavelet', args.wavelet_kernel2)
-	elif args.custom_kernel2 is not None:
+	elif args.custom_kernel2:
 		cf2.set_kernel_type('custom', args.custom_kernel2)
-	if args.vote_threshold2 is not None:
+	if args.vote_threshold2:
 		cf2.set_vote_threshold(args.vote_threshold2)
 
 	# runs the centerfinding algorithm
@@ -202,19 +167,80 @@ def main():
 		do_dencon2 = False
 		keep_neg_wts2 = False
 	dencon_args2 = (do_dencon2, keep_neg_wts2)
-	cf2.find_centers(dencon=dencon_args2,
-					overden=args.overdensity2,
-					cleanup=False)
+	cf2.get_density_grid(dencon=dencon_args2, overden=args.overdensity2)
+	cf2.make_convolved_grid()
 	W2 = cf2.centers_grid
-	cf2.cleanup()
+	del cf2
 
-	W = fftconvolve(W1, W2, mode='same')
+
+	# creates and customizes instance of 1st CenterFinder object
+	cf1 = CenterFinder(args.file1, args.weighted_input1, 
+		args.params_file, args.save, args.verbose)
+	if args.kernel_radius1:
+		cf1.set_kernel_radius(args.kernel_radius1)
+	if args.show_kernel1:
+		cf1.set_show_kernel(args.show_kernel1)
+	if args.step_kernel1:
+		cf1.set_kernel_type('step', args.step_kernel1)
+	elif args.gaussian_kernel1:
+		cf1.set_kernel_type('gaussian', args.gaussian_kernel1)
+	elif args.wavelet_kernel1:
+		cf1.set_kernel_type('wavelet', args.wavelet_kernel1)
+	elif args.custom_kernel1:
+		cf1.set_kernel_type('custom', args.custom_kernel1)
+	if args.vote_threshold1:
+		cf1.set_vote_threshold(args.vote_threshold1)
+
+	# runs the centerfinding algorithm
+	if args.density_contrast1:
+		do_dencon1 = True
+		if len(args.density_contrast1)==0:
+			keep_neg_wts1 = True
+		else:
+			keep_neg_wts1 = False
+	else:
+		do_dencon1 = False
+		keep_neg_wts1 = False
+	dencon_args1 = (do_dencon1, keep_neg_wts1)
+	cf1.get_density_grid(dencon=dencon_args1, overden=args.overdensity1)
+
+
 	savename = 'out_xcorr_{}_{}/'.format(filename1, filename2)
 	try:
 		os.mkdir(savename)
 	except FileExistsError:
 		pass
-	np.save(savename + f'W_r1_{args.kernel_radius1}_r2_{args.kernel_radius2}.npy', W)
+
+	if args.scan:
+		start, end = args.scan
+		corrfunc = {r:0 for r in range(start,end,5)}
+
+		for r in corrfunc.keys():
+			cf1.set_kernel_radius(r)
+			cf1.make_convolved_grid()
+			W1 = cf1.centers_grid
+			cf1.cleanup()
+
+			W = W1 * W2
+			np.save(savename + f'W_r1_{args.kernel_radius1}_r2_{args.kernel_radius2}.npy', W)
+
+			corrfunc[r] = np.sum(W)
+
+		del cf1
+
+	else:
+		cf1.make_convolved_grid()
+		W1 = cf1.centers_grid
+		del cf1
+
+		W = W1 * W2
+		np.save(savename + f'W_r1_{args.kernel_radius1}_r2_{args.kernel_radius2}.npy', W)
+
+
+	import matplotlib.pyplot as plt
+	plt.plot(corrfunc.keys(), corrfunc.values())
+	plt.savefig(f'conker_scan_{corrfunc.keys()[0]}_{corrfunc.keys()[-1]}')
+	plt.show()
 
 	# subprocess.run(['python','cfdriver.py',args.file1,'-r1', args.kernel_radius1])
 
