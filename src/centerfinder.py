@@ -15,6 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses.
 """
 
+import time
 import os
 import json
 import numpy as np
@@ -38,6 +39,7 @@ class CenterFinder():
 		self.kernel_args = kernel_args
 		self.show_kernel = False
 		self.vote_threshold = vote_threshold
+		self.weighted = wtd
 
 		self.filename = '.'.join(galaxy_file.split('.')[:-1])
 		self.save = save
@@ -45,7 +47,7 @@ class CenterFinder():
 		self.printout = printout
 
 		# loads galaxy data arrays
-		if not wtd:
+		if not self.weighted:
 			self.G_ra, self.G_dec, self.G_redshift = load_data(galaxy_file)
 			self.G_weights = np.ones(len(self.G_ra), dtype=float)
 		else:
@@ -211,10 +213,14 @@ class CenterFinder():
 		if self.printout:
 			print('Sum total of weights:', N_tot)
 
+		start = time.time()
 		# get volume adjustment grid, the differentials in sky coordinate dimensions and the number of bins in each dimension
 		vol_adjust_ratio_grid, d_r, d_alpha, d_delta, N_bins_r, N_bins_alpha, N_bins_delta = \
 			self._volume_adjustment(bin_centers_radii, bin_centers_ra, bin_centers_dec, grid.shape)
+		end = time.time()
+		print(f'\nvolume_adjustment took time: {end-start} seconds\n')
 
+		start = time.time()
 		# alpha-delta and z counts
 		N_bins_x, N_bins_y, N_bins_z = grid.shape[0], grid.shape[1], grid.shape[2]
 		sky_coords_grid_shape = (N_bins_x, N_bins_y, N_bins_z, 3)  # need to store a triple at each grid bin
@@ -223,7 +229,10 @@ class CenterFinder():
 		if self.printout:
 			print('Shape of grid containing sky coordinates of observed grid\'s bin centers:', 
 				sky_coords_grid.shape)
+		end = time.time()
+		print(f'\ncreating sky_coords_grid took time: {end-start} seconds\n')
 
+		start = time.time()
 		# getting some variables ready for the projection step
 		alpha_min = bin_centers_ra.min()
 		d_alpha = np.rad2deg(d_alpha)
@@ -245,8 +254,14 @@ class CenterFinder():
 		sky_coords_grid[:, :, :, 1][sky_coords_grid[:, :, :, 1] == N_bins_delta] = N_bins_delta - 1
 		sky_coords_grid[:, :, :, 2][sky_coords_grid[:, :, :, 2] == N_bins_r] = N_bins_r - 1
 
+		end = time.time()
+		print(f'\nmodifying sky_coords_grid took time: {end-start} seconds\n')
+
+		start = time.time()
 		alpha_delta_grid, r_grid = self._alpha_delta_r_projections_from_grid(grid, 
 			N_bins_x, N_bins_y, N_bins_z, sky_coords_grid, N_bins_alpha, N_bins_delta, N_bins_r)
+		end = time.time()
+		print(f'\nalpha_delta_r_projections took time: {end-start} seconds\n')
 		if self.printout:
 			print('Shape of alpha-delta grid:', alpha_delta_grid.shape)
 			print('Shape of r grid:', r_grid.shape)
@@ -257,12 +272,32 @@ class CenterFinder():
 			print('N_tot_observed = N_tot_alpha_delta = N_tot_r:', 
 				N_tot == np.sum(alpha_delta_grid) == np.sum(r_grid))
 
-		# TODO: meshgrid this
-		expected_grid = np.array([[[alpha_delta_grid[sky_coords_grid[i, j, k, 0], sky_coords_grid[i, j, k, 1]]
-									 * r_grid[sky_coords_grid[i, j, k, 2]]
-									for k in range(N_bins_z)]
-								   for j in range(N_bins_y)]
-								  for i in range(N_bins_x)])
+		# # # TODO: meshgrid this
+		# start = time.time()
+		# expected_grid = np.array([[[alpha_delta_grid[sky_coords_grid[i, j, k, 0], sky_coords_grid[i, j, k, 1]]
+		# 							 * r_grid[sky_coords_grid[i, j, k, 2]]
+		# 							for k in range(N_bins_z)]
+		# 						   for j in range(N_bins_y)]
+		# 						  for i in range(N_bins_x)])
+		# end = time.time()
+		# print(f'\nexpected_grid 1 took time: {end-start} seconds\n')
+
+		# expected_grid /= N_tot  # normalization
+		# expected_grid *= vol_adjust_ratio_grid  # volume adjustment
+		# if self.printout:
+		# 	print('Expected grid shape:', expected_grid.shape)
+		# 	print('Maximum number of expected votes:', expected_grid.max())
+		# 	print('Minimum number of expected votes:', expected_grid.min())
+
+
+		start = time.time()
+		i = np.arange(N_bins_x)[:,None,None]
+		j = np.arange(N_bins_y)[None,:,None]
+		k = np.arange(N_bins_z)[None,None,:]
+		expected_grid = alpha_delta_grid[sky_coords_grid[i,j,k,0], sky_coords_grid[i,j,k,1]] \
+						* r_grid[sky_coords_grid[i,j,k,2]]
+		end = time.time()
+		print(f'\nexpected_grid 2 took time: {end-start} seconds\n')
 
 		expected_grid /= N_tot  # normalization
 		expected_grid *= vol_adjust_ratio_grid  # volume adjustment
@@ -316,16 +351,52 @@ class CenterFinder():
 
 
 
+	# def _alpha_delta_r_projections_from_grid(self, grid: np.ndarray, N_bins_x: int, N_bins_y: int, N_bins_z: int, 
+	# 	sky_coords_grid: np.ndarray, N_bins_alpha: int, N_bins_delta: int, N_bins_r: int) -> (np.ndarray, np.ndarray):
+
+	# 	alpha_delta_grid = np.zeros((N_bins_alpha, N_bins_delta))
+	# 	r_grid = np.zeros((N_bins_r,))
+	# 	for i in range(N_bins_x):
+	# 		for j in range(N_bins_y):
+	# 			for k in range(N_bins_z):
+	# 				alpha_delta_grid[sky_coords_grid[i, j, k, 0], sky_coords_grid[i, j, k, 1]] += grid[i, j, k]
+	# 				r_grid[sky_coords_grid[i, j, k, 2]] += grid[i, j, k]
+
+	# 	return alpha_delta_grid, r_grid
+
+
+	# def _alpha_delta_r_projections_from_grid(self, grid: np.ndarray, N_bins_x: int, N_bins_y: int, N_bins_z: int, 
+	# 	sky_coords_grid: np.ndarray, N_bins_alpha: int, N_bins_delta: int, N_bins_r: int) -> (np.ndarray, np.ndarray):
+
+	# 	i = np.arange(N_bins_x)[:,None,None]
+	# 	j = np.arange(N_bins_y)[None,:,None]
+	# 	k = np.arange(N_bins_z)[None,None,:]
+	# 	alpha_delta_grid = np.zeros((N_bins_alpha, N_bins_delta))
+	# 	r_grid = np.zeros((N_bins_r,))
+
+	# 	alpha_delta_grid[sky_coords_grid[i,j,k,0], sky_coords_grid[i,j,k,1]] += grid[i,j,k]
+	# 	r_grid[sky_coords_grid[i,j,k,2]] += grid[i,j,k]
+
+	# 	return alpha_delta_grid, r_grid
+
+
+	# def _alpha_delta_r_projections_from_grid(self, grid: np.ndarray, N_bins_x: int, N_bins_y: int, N_bins_z: int, 
+	# 	sky_coords_grid: np.ndarray, N_bins_alpha: int, N_bins_delta: int, N_bins_r: int) -> (np.ndarray, np.ndarray):
+
+	# 	alpha_delta_grid, _, _ = np.histogram2d(self.G_ra, self.G_dec, 
+	# 								bins=(N_bins_alpha, N_bins_delta), weights=self.G_weights)
+	# 	r_grid, _ = np.histogram(self.G_radii, bins=N_bins_r, weights=self.G_weights)
+
+	# 	return alpha_delta_grid, r_grid
+
+
 	def _alpha_delta_r_projections_from_grid(self, grid: np.ndarray, N_bins_x: int, N_bins_y: int, N_bins_z: int, 
 		sky_coords_grid: np.ndarray, N_bins_alpha: int, N_bins_delta: int, N_bins_r: int) -> (np.ndarray, np.ndarray):
 
-		alpha_delta_grid = np.zeros((N_bins_alpha, N_bins_delta))
-		r_grid = np.zeros((N_bins_r,))
-		for i in range(N_bins_x):
-			for j in range(N_bins_y):
-				for k in range(N_bins_z):
-					alpha_delta_grid[sky_coords_grid[i, j, k, 0], sky_coords_grid[i, j, k, 1]] += grid[i, j, k]
-					r_grid[sky_coords_grid[i, j, k, 2]] += grid[i, j, k]
+		# print(sky_coords_grid[:,:,:,0].shape)
+		# print(sky_coords_grid[:,:,:,0].ravel().shape)
+		alpha_delta_grid, _, _ = np.histogram2d(sky_coords_grid[:,:,:,0].ravel(), sky_coords_grid[:,:,:,1].ravel(), bins=(N_bins_alpha, N_bins_delta), weights=grid.ravel())
+		r_grid, _ = np.histogram(sky_coords_grid[:,:,:,2].ravel(), bins=N_bins_r, weights=grid.ravel())
 
 		return alpha_delta_grid, r_grid
 
