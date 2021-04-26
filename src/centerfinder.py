@@ -393,7 +393,8 @@ class CenterFinder():
 	def _alpha_delta_r_projections_from_grid(self, grid: np.ndarray, N_bins_x: int, N_bins_y: int, N_bins_z: int, 
 		sky_coords_grid: np.ndarray, N_bins_alpha: int, N_bins_delta: int, N_bins_r: int) -> (np.ndarray, np.ndarray):
 
-		alpha_delta_grid, _, _ = np.histogram2d(sky_coords_grid[:,:,:,0].ravel(), sky_coords_grid[:,:,:,1].ravel(), bins=(N_bins_alpha, N_bins_delta), weights=grid.ravel())
+		alpha_delta_grid, _, _ = np.histogram2d(sky_coords_grid[:,:,:,0].ravel(), sky_coords_grid[:,:,:,1].ravel(), 
+												bins=(N_bins_alpha, N_bins_delta), weights=grid.ravel())
 		r_grid, _ = np.histogram(sky_coords_grid[:,:,:,2].ravel(), bins=N_bins_r, weights=grid.ravel())
 
 		return alpha_delta_grid, r_grid
