@@ -41,10 +41,14 @@ class CenterFinder():
 		self.vote_threshold = vote_threshold
 		self.weighted = wtd
 
+		self.printout = printout
 		self.filename = '.'.join(galaxy_file.split('.')[:-1])
 		self.save = save
-		self.savename = f'out_{self.filename}/'
-		self.printout = printout
+		self.savename = f'out_centerfinder_{self.filename}/'
+		try:
+			os.mkdir(self.savename)
+		except FileExistsError:
+			pass
 
 		# loads galaxy data arrays
 		if not self.weighted:
@@ -61,9 +65,10 @@ class CenterFinder():
 
 		self.G_radii = self.LUT_radii(self.G_redshift)
 
-		self.background = None
+		self.randoms_grid = None
 		self.density_grid = None
 		self.density_grid_edges = None
+		self.background_grid = None
 		self.centers_grid = None
 
 
@@ -97,7 +102,10 @@ class CenterFinder():
 
 
 
-	def _make_density_grid(self, dencon: tuple = (False, False), overden: bool = False):
+	def _make_grids(self, dencon: tuple = (False, False), overden: bool = False):
+		"""
+		Creates both density grid and randoms grid.
+		"""
 
 		xyzs = sky2cartesian(self.G_ra, self.G_dec, self.G_redshift, self.LUT_radii) # galaxy x, y and z coordinates
 		self.galaxies_cartesian = np.array(xyzs).T  # each galaxy is represented by (x, y, z)
@@ -116,10 +124,9 @@ class CenterFinder():
 
 		# makes expected grid and subtracts it from the density grid
 		if dencon[0]:
-			if not self.background:
-				self.set_background(self._project_and_sample(self.density_grid, self.density_grid_edges))
-			self.density_grid -= self.get_background()
-			# del background
+			if not self.randoms_grid:
+				self.randoms_grid = self._project_and_sample(self.density_grid, self.density_grid_edges)
+			self.density_grid -= self.randoms_grid
 			# keep or discard negative valued weights
 			# dencon[1] set to True means keep negative weights
 			if not dencon[1]:
@@ -144,27 +151,51 @@ class CenterFinder():
 
 
 
-	def _convolve(self):
+	def _convolve_density_grid(self):
+		"""
+		Convolves density grid and sets it as centers grid (signal grid).
+		"""
 	
 		# makes the kernel for scanning over the density grid
-		kernel = Kernel(self.kernel_type, self.kernel_radius, self.grid_spacing,
+		self.kernel = Kernel(self.kernel_type, self.kernel_radius, self.grid_spacing,
 			self.printout, self.show_kernel, *self.kernel_args)
 
 		# this scans the kernel over the whole volume of the galaxy density grid
 		# calculates the tensor inner product of the two at each step
 		# and finally stores this value as the number of voters per that bin in the centers grid
-		self.centers_grid = fftconvolve(self.density_grid, kernel.get_grid(), mode='same')
+		self.centers_grid = fftconvolve(self.density_grid, self.kernel.get_grid(), mode='same')
 		
 		if self.printout:
-			print('Voting procedure completed successfully...')
-			print('Centers grid shape:', self.centers_grid.shape)
-			print('Maximum number of votes per single bin:', self.centers_grid.max())
-			print('Minimum number of votes per single bin:', self.centers_grid.min())
+			print('Convolution of density grid completed successfully...')
+			print('Signal grid shape:', self.centers_grid.shape)
+			print('Maximum value per single bin in signal grid W:', self.centers_grid.max())
+			print('Minimum value per single bin in signal grid W:', self.centers_grid.min())
 
 		# save whole grid without a vote cut
 		if self.save:
-			np.save(self.savename + f'centers_grid_r_{self.kernel_radius}_no_cut.npy', 
-				self.centers_grid)
+			np.save(self.savename + f'convolved_density_grid_r_{self.kernel_radius}'
+				'_t_{self.vote_threshold}.npy', self.centers_grid)
+
+
+
+	def _convolve_randoms_grid(self):
+		"""
+		Convolves randoms grid and sets it as background grid.
+		"""
+
+		# needed for background in conker
+		self.background_grid = fftconvolve(self.randoms_grid, self.kernel.get_grid(), mode='same')
+		
+		if self.printout:
+			print('Convolution of randoms grid completed successfully...')
+			print('Background grid shape:', self.background_grid.shape)
+			print('Maximum value per single bin in background grid B:', self.background_grid.max())
+			print('Minimum value per single bin in background grid B:', self.background_grid.min())
+
+		# save whole grid without a vote cut
+		if self.save:
+			np.save(self.savename + f'background_grid_r_{self.kernel_radius}'
+				'_t_{self.vote_threshold}.npy', self.background_grid)
 
 
 
@@ -272,7 +303,6 @@ class CenterFinder():
 			print('N_tot_observed = N_tot_alpha_delta = N_tot_r:', 
 				N_tot == np.sum(alpha_delta_grid) == np.sum(r_grid))
 
-		# # # TODO: meshgrid this
 		# start = time.time()
 		# expected_grid = np.array([[[alpha_delta_grid[sky_coords_grid[i, j, k, 0], sky_coords_grid[i, j, k, 1]]
 		# 							 * r_grid[sky_coords_grid[i, j, k, 2]]
@@ -288,7 +318,6 @@ class CenterFinder():
 		# 	print('Expected grid shape:', expected_grid.shape)
 		# 	print('Maximum number of expected votes:', expected_grid.max())
 		# 	print('Minimum number of expected votes:', expected_grid.min())
-
 
 		start = time.time()
 		i = np.arange(N_bins_x)[:,None,None]
@@ -403,31 +432,49 @@ class CenterFinder():
 
 	def cleanup(self):
 		del self.centers_grid
+		del self.background_grid
 		del self.kernel_radius
 
 
-	def set_background(self, bg):
-		""" DO NOT SET IF GONNA MUTATE """
-		""" TODO: check that it sets class variable by 
-		reference and not a deep copy """
-		self.background = bg
-
-
-	def get_background(self):
-		return self.background
-
-
 	def set_density_grid(self, dg):
-		""" DO NOT SET IF GONNA MUTATE """
 		self.density_grid = dg
 
 
-	def get_density_grid(self, dencon: bool, overden: bool):
-		self._make_density_grid(dencon=dencon, overden=overden)
+	def get_density_grid(self):
+		return self.density_grid
 
 
-	def make_convolved_grid(self):
-		self._convolve()
+	def set_randoms_grid(self, rg):
+		self.randoms_grid = rg
+
+
+	def get_randoms_grid(self):
+		return self.randoms_grid
+
+
+	def set_centers_grid(self, cg):
+		self.centers_grid = cg
+
+
+	def get_centers_grid(self):
+		return self.centers_grid
+
+
+	def set_background_grid(self, bg):
+		self.background_grid = bg
+
+
+	def get_background_grid(self):
+		return self.background_grid
+
+
+	def make_grids(self, dencon: bool, overden: bool):
+		self._make_grids(dencon=dencon, overden=overden)
+
+
+	def make_convolved_grids(self):
+		self._convolve_density_grid()
+		self._convolve_randoms_grid()
 
 
 	def find_centers(self, dencon: bool, overden: bool, cleanup: bool = True):
@@ -439,8 +486,8 @@ class CenterFinder():
 		if self.printout:
 			print(self)
 
-		self._make_density_grid(dencon=dencon, overden=overden)
-		self._convolve()
+		self._make_grids(dencon=dencon, overden=overden)
+		self._convolve_density_grid()
 		
 		# TODO: clean this up
 		# self.centers_grid[self.centers_grid < self.vote_threshold] = 0

@@ -19,7 +19,6 @@ import os
 import subprocess
 from argparse import ArgumentParser
 from src.centerfinder import CenterFinder
-from scipy.signal import fftconvolve
 import numpy as np
 
 
@@ -164,14 +163,14 @@ def main():
 		keep_neg_wts0 = False
 	dencon_args0 = (do_dencon0, keep_neg_wts0)
 
-	cf0.get_density_grid(dencon=dencon_args0, overden=args.overdensity0)
-	# if self-correlation, keeps background so it calculates it only once
+	cf0.make_grids(dencon=dencon_args0, overden=args.overdensity0)
+	# if self-correlation, keeps density and randoms so it calculates only once
 	if not args.input_file_0:
-		# TODO: make these into instance variables of CF object
-		density_grid = cf0.density_grid
-		# background = cf0.background
-	cf0.make_convolved_grid()
-	W0 = cf0.centers_grid
+		density_grid = cf0.get_density_grid()
+		randoms_grid = cf0.get_randoms_grid()
+	cf0.make_convolved_grids()
+	W0 = cf0.get_centers_grid()
+	B0 = cf0.get_background_grid()
 	del cf0
 
 
@@ -204,16 +203,15 @@ def main():
 		do_dencon1 = False
 		keep_neg_wts1 = False
 	dencon_args1 = (do_dencon1, keep_neg_wts1)
-	# doesn't recalculate background and density grid
+	# doesn't recalculate randoms and density grid if self-cor
 	if not args.input_file_0:
 		cf1.set_density_grid(density_grid)
-		# cf1.set_background(background)
-		del density_grid#, background
+		cf1.set_randoms_grid(randoms_grid)
 	else:
-		cf1.get_density_grid(dencon=dencon_args1, overden=args.overdensity1)
+		cf1.make_grids(dencon=dencon_args1, overden=args.overdensity1)
 
 
-	savename = 'out_xcorr_{}_{}/'.format(filename1, filename0)
+	savename = 'out_conker_{}_{}/'.format(filename1, filename0)
 	try:
 		os.mkdir(savename)
 	except FileExistsError:
@@ -225,15 +223,18 @@ def main():
 
 		for r in corrfunc.keys():
 			cf1.set_kernel_radius(r)
-			cf1.make_convolved_grid()
-			W1 = cf1.centers_grid
+			cf1.make_convolved_grids()
+			W1 = cf1.get_centers_grid()
+			B1 = cf1.get_background_grid()
 			cf1.cleanup()
 
-			W = W1 * W0
+			W = W0 * W1
+			B = B0 * B1
 			if args.save:
 				np.save(savename + f'W_r1_{r}_r0_{args.kernel_radius0}.npy', W)
+				np.save(savename + f'B_r1_{r}_r0_{args.kernel_radius0}.npy', B)
 
-			corrfunc[r] = np.sum(W)
+			corrfunc[r] = np.sum(W) / np.sum(B)
 
 		del cf1
 
@@ -246,18 +247,18 @@ def main():
 		plt.plot(separation, correlation)
 		plt.savefig(savename + f'conker_scan_{separation[0]}_{separation[-1]}.png')
 
-	else:
-		cf1.make_convolved_grid()
-		W1 = cf1.centers_grid
-		del cf1
+	# else:
+	# 	cf1.make_convolves_grids()
+	# 	W1 = cf1.get_centers_grid()
+	# 	del cf1
 
-		W = W1 * W0
-		if args.save:
-			np.save(savename + f'W_r1_{args.kernel_radius1}_r0_{args.kernel_radius0}.npy', W)
+	# 	W = W1 * W0
+	# 	if args.save:
+	# 		np.save(savename + f'W_r1_{args.kernel_radius1}_r0_{args.kernel_radius0}.npy', W)
 
-		correlation = np.sum(W)
-		np.save(savename + f'separation_{args.kernel_radius1}.npy', args.kernel_radius1)
-		np.save(savename + f'correlation_{args.kernel_radius1}.npy', correlation)
+	# 	correlation = np.sum(W)
+	# 	np.save(savename + f'separation_{args.kernel_radius1}.npy', args.kernel_radius1)
+	# 	np.save(savename + f'correlation_{args.kernel_radius1}.npy', correlation)
 
 
 	# subprocess.run(['python','cfdriver.py',args.file1,'-r1', args.kernel_radius1])
