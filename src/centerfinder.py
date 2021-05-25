@@ -34,6 +34,8 @@ class CenterFinder():
 		kernel_radius: float = 110., kernel_type: str = 'step', 
 		kernel_args: list = [], vote_threshold: float = -inf):
 
+		self.float_precision = 5
+
 		self.kernel_radius = kernel_radius
 		self.kernel_type = kernel_type
 		self.kernel_args = kernel_args
@@ -45,10 +47,11 @@ class CenterFinder():
 		self.filename = '.'.join(galaxy_file.split('.')[:-1])
 		self.save = save
 		self.savename = f'out_centerfinder_{self.filename}/'
-		try:
-			os.mkdir(self.savename)
-		except FileExistsError:
-			pass
+		if self.save:
+			try:
+				os.mkdir(self.savename)
+			except FileExistsError:
+				pass
 
 		# loads galaxy data arrays
 		if not self.weighted:
@@ -122,11 +125,12 @@ class CenterFinder():
 			print('Histogramming completed successfully...')
 			print('Density grid shape:', self.density_grid.shape)
 
-		# makes expected grid and subtracts it from the density grid
+		# makes randoms grid and subtracts it from the density grid
 		if dencon[0]:
 			if not self.randoms_grid:
 				self.randoms_grid = self._project_and_sample(self.density_grid, self.density_grid_edges)
 			self.density_grid -= self.randoms_grid
+
 			# keep or discard negative valued weights
 			# dencon[1] set to True means keep negative weights
 			if not dencon[1]:
@@ -164,6 +168,9 @@ class CenterFinder():
 		# calculates the tensor inner product of the two at each step
 		# and finally stores this value as the number of voters per that bin in the centers grid
 		self.centers_grid = fftconvolve(self.density_grid, self.kernel.get_grid(), mode='same')
+		# TODO: finalize infinitesimal value rounding
+		# np.around(self.centers_grid, decimals=self.float_precision, out=self.centers_grid)
+		self.centers_grid[np.abs(self.centers_grid) < 10**(-self.float_precision)] = 0.0
 		
 		if self.printout:
 			print('Convolution of density grid completed successfully...')
@@ -174,7 +181,7 @@ class CenterFinder():
 		# save whole grid without a vote cut
 		if self.save:
 			np.save(self.savename + f'convolved_density_grid_r_{self.kernel_radius}'
-				'_t_{self.vote_threshold}.npy', self.centers_grid)
+				f'_t_{self.vote_threshold}.npy', self.centers_grid)
 
 
 
@@ -185,6 +192,9 @@ class CenterFinder():
 
 		# needed for background in conker
 		self.background_grid = fftconvolve(self.randoms_grid, self.kernel.get_grid(), mode='same')
+		# TODO: finalize infinitesimal value rounding
+		# np.around(self.background_grid, decimals=self.float_precision, out=self.background_grid)
+		self.background_grid[np.abs(self.background_grid) < 10**(-self.float_precision)] = 0.0
 		
 		if self.printout:
 			print('Convolution of randoms grid completed successfully...')
@@ -195,11 +205,11 @@ class CenterFinder():
 		# save whole grid without a vote cut
 		if self.save:
 			np.save(self.savename + f'background_grid_r_{self.kernel_radius}'
-				'_t_{self.vote_threshold}.npy', self.background_grid)
+				f'_t_{self.vote_threshold}.npy', self.background_grid)
 
 
 
-	def _project_and_sample(self, grid: np.ndarray, grid_edges: list) -> (np.ndarray, tuple):
+	def _project_and_sample(self, grid: np.ndarray, grid_edges: list) -> np.ndarray:
 		
 		# TODO: these are unnecessary, remove and reference self's attribute
 		bin_centers_edges_xs, bin_centers_edges_ys, bin_centers_edges_zs = \
@@ -343,7 +353,7 @@ class CenterFinder():
 
 
 	def _volume_adjustment(self, bin_centers_radii: np.array, bin_centers_ra: np.array, 
-		bin_centers_dec: np.array, observed_grid_shape: tuple) -> np.ndarray:
+		bin_centers_dec: np.array, observed_grid_shape: tuple):
 		
 		# radius
 		mid_r = (bin_centers_radii.max() + bin_centers_radii.min()) / 2

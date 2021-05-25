@@ -22,16 +22,6 @@ from src.centerfinder import CenterFinder
 import numpy as np
 
 
-# class XCorrelator(CenterFinder):
-
-# 	def __init__(self, galaxy_file: str, wtd: bool, params_file: str, save: bool, printout: bool,
-# 		kernel_radius: float = 110., kernel_type: str = 'step', 
-# 		kernel_args: list = [], vote_threshold: float = -inf):
-
-# 		CenterFinder.__init__(self, )
-
-# 	def xcorrelate():
-# 		self.M1
 
 
 def main():
@@ -136,6 +126,8 @@ def main():
 	file0 = args.file1 if not args.input_file_0 else args.input_file_0
 	cf0 = CenterFinder(file0, args.weighted_input0, 
 		args.params_file, args.save, args.verbose, kernel_type='ball')
+	# defaults kernel_radius to 1/2 grid_spacing for 0th centerfinder
+	cf0.set_kernel_radius(cf0.grid_spacing / 2)
 	if args.kernel_radius0:
 		cf0.set_kernel_radius(args.kernel_radius0)
 	if args.show_kernel0:
@@ -151,26 +143,32 @@ def main():
 	if args.vote_threshold0:
 		cf0.set_vote_threshold(args.vote_threshold0)
 
-	# runs the centerfinding algorithm
-	if args.density_contrast0 is not None:
+	# legacy, customizes the background subtraction process
+	if args.density_contrast0:
 		do_dencon0 = True
 		if len(args.density_contrast0)==0:
 			keep_neg_wts0 = True
 		else:
 			keep_neg_wts0 = False
 	else:
-		do_dencon0 = False
-		keep_neg_wts0 = False
+		do_dencon0 = True
+		keep_neg_wts0 = True
 	dencon_args0 = (do_dencon0, keep_neg_wts0)
-
+	# runs the centerfinding algorithm
 	cf0.make_grids(dencon=dencon_args0, overden=args.overdensity0)
 	# if self-correlation, keeps density and randoms so it calculates only once
 	if not args.input_file_0:
 		density_grid = cf0.get_density_grid()
 		randoms_grid = cf0.get_randoms_grid()
-	cf0.make_convolved_grids()
-	W0 = cf0.get_centers_grid()
-	B0 = cf0.get_background_grid()
+	# there's no need for convolving 
+	# if the whole kernel is just one cell
+	if cf0.kernel_radius == cf0.grid_spacing/2:
+		W0 = cf0.get_density_grid()
+		B0 = cf0.get_randoms_grid()
+	else:
+		cf0.make_convolved_grids()
+		W0 = cf0.get_centers_grid()
+		B0 = cf0.get_background_grid()
 	del cf0
 
 
@@ -191,8 +189,7 @@ def main():
 		cf1.set_kernel_type('custom', args.custom_kernel1)
 	if args.vote_threshold1:
 		cf1.set_vote_threshold(args.vote_threshold1)
-
-	# runs the centerfinding algorithm
+	
 	if args.density_contrast1:
 		do_dencon1 = True
 		if len(args.density_contrast1)==0:
@@ -200,13 +197,14 @@ def main():
 		else:
 			keep_neg_wts1 = False
 	else:
-		do_dencon1 = False
-		keep_neg_wts1 = False
+		do_dencon1 = True
+		keep_neg_wts1 = True
 	dencon_args1 = (do_dencon1, keep_neg_wts1)
 	# doesn't recalculate randoms and density grid if self-cor
 	if not args.input_file_0:
 		cf1.set_density_grid(density_grid)
 		cf1.set_randoms_grid(randoms_grid)
+	# runs the centerfinding algorithm again if x-cor
 	else:
 		cf1.make_grids(dencon=dencon_args1, overden=args.overdensity1)
 
@@ -219,7 +217,7 @@ def main():
 
 	if args.scan:
 		start, end = args.scan
-		corrfunc = {r:None for r in range(start,end,5)}
+		corrfunc = {r: None for r in range(start, end, cf1.grid_spacing)}
 
 		for r in corrfunc.keys():
 			cf1.set_kernel_radius(r)
@@ -248,7 +246,7 @@ def main():
 		plt.savefig(savename + f'conker_scan_{separation[0]}_{separation[-1]}.png')
 
 	# else:
-	# 	cf1.make_convolves_grids()
+	# 	cf1.make_convolved_grids()
 	# 	W1 = cf1.get_centers_grid()
 	# 	del cf1
 
@@ -260,8 +258,6 @@ def main():
 	# 	np.save(savename + f'separation_{args.kernel_radius1}.npy', args.kernel_radius1)
 	# 	np.save(savename + f'correlation_{args.kernel_radius1}.npy', correlation)
 
-
-	# subprocess.run(['python','cfdriver.py',args.file1,'-r1', args.kernel_radius1])
 
 
 if __name__ == '__main__':
