@@ -27,12 +27,21 @@ from .kernel import Kernel
 
 
 
-class CenterFinder():
+class CenterFinder:
 
 
-	def __init__(self, galaxy_file: str, wtd: bool, params_file: str, save: bool, printout: bool,
-		kernel_radius: float = 110., kernel_type: str = 'step', 
-		kernel_args: list = [], vote_threshold: float = -inf):
+	def __init__(
+		self, 
+		galaxy_file: str, 
+		wtd: bool, 
+		params_file: str, 
+		save: bool, 
+		printout: bool,
+		kernel_radius: float = 110., 
+		kernel_type: str = 'step', 
+		kernel_args: list = None, 
+		vote_threshold: float = -inf
+		):
 
 		self.float_precision = 5
 
