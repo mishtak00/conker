@@ -39,6 +39,8 @@ class Kernel:
 			print('Kernel constructed successfully...')
 			print('Number of nonzero kernel bins:', len(self.grid[self.grid!=0]))
 			print('Number of empty kernel bins:', len(self.grid[self.grid==0]))
+			print('Nonzero to empty ratio:', 
+				len(self.grid[self.grid!=0]) / len(self.grid[self.grid==0]))
 
 		# this is here for sanity checks
 		# shows the kernel in 3D with blue disks in nonzero kernel bins

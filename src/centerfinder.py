@@ -39,7 +39,7 @@ class CenterFinder:
 		printout: bool,
 		kernel_radius: float = 110., 
 		kernel_type: str = 'step', 
-		kernel_args: list = None, 
+		kernel_args: list = [], 
 		vote_threshold: float = -inf
 		):
 
@@ -84,7 +84,6 @@ class CenterFinder:
 		self.centers_grid = None
 
 
-
 	def __str__(self):
 		return 'CenterFinder object\n'\
 				f'Galaxy data file: {self.filename}\n'\
@@ -93,7 +92,6 @@ class CenterFinder:
 				f'RA range: [{self.G_ra.min()}, {self.G_ra.max()}]\n'\
 				f'DEC range: [{self.G_dec.min()}, {self.G_dec.max()}]\n'\
 				f'Z range: [{self.G_redshift.min()}, {self.G_redshift.max()}]'
-
 
 
 	def set_kernel_radius(self, kr: float):

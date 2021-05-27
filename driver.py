@@ -32,13 +32,25 @@ def main():
 	parser = ArgumentParser(description=
 		'~~~~~~~~~~~~~~~~~ ( X ) ConKer ( X ) ~~~~~~~~~~~~~~~~~')
 
-	# these read input and parameter files
+	# core conker variables
 	parser.add_argument('file1', metavar='INPUT_FILE_1', type=str, 
 		help='Name of .fits file with the input data.')
-	parser.add_argument('-f0', '--input_file_0', type=str, default=None,
-		help='Name of .fits file with the input data.')
+	parser.add_argument('-f0', '--file0', type=str, default=None,
+		help='Name of .fits file with the input data.'\
+				'Self-correlation if ommitted. Cross-correlation if present.')
+	parser.add_argument('-n', '--order', type=int, default=2,
+		help='Correlation order wanted.')
 	parser.add_argument('-p', '--params_file', type=str, default='params.json', 
 		help='Sets custom hyperparameters file.')
+
+	# ancillary behaviors
+	parser.add_argument('-s', '--save', action='store_true', 
+		help='Grids and .fits output will be automatically saved to an \'out\' folder.')
+	parser.add_argument('-v', '--verbose', action='store_true', 
+		help='The progress of CenterFinder will be printed out to standard output.')
+	parser.add_argument('--scan', nargs=2, type=int,
+		help='Calculates correlation function from 1st arg (iclusive) '
+				'to 2nd arg (exclusive) by step of grid_spacing.')
 	
 	# these define 1st kernel behavior
 	parser.add_argument('-r1', '--kernel_radius1', type=float, help='Sets kernel radius.')
@@ -101,151 +113,50 @@ def main():
 	con_or_over.add_argument('-o0', '--overdensity0', action='store_true',
 		help='CenterFinder will subtract average density from the galaxy '\
 		'density grid before voting.')
-	
-	# ancillary behaviors
-	parser.add_argument('-s', '--save', action='store_true', 
-		help='Grids and .fits output will be automatically saved to an \'out\' folder.')
-	parser.add_argument('-v', '--verbose', action='store_true', 
-		help='The progress of CenterFinder will be printed out to standard output.')
-	parser.add_argument('--scan', nargs=2, type=int,
-		help='Calculates correlation function from 1st arg (iclusive) '
-				'to 2nd arg (exclusive) by step of grid_spacing.')
 
 	args = parser.parse_args()
 
 	# deletes the .fits extension and
 	# allows for other '.'s in the args.file string
 	filename1 = '.'.join(args.file1.split('.')[:-1])
-	if args.input_file_0:
-		filename0 = '.'.join(args.input_file_0.split('.')[:-1])
+	if args.file0:
+		filename0 = '.'.join(args.file0.split('.')[:-1])
 	else:
 		filename0 = filename1
-
-
-	# creates and customizes instance of 0th CenterFinder object
-	file0 = args.file1 if not args.input_file_0 else args.input_file_0
-	cf0 = CenterFinder(file0, args.weighted_input0, 
-		args.params_file, args.save, args.verbose, kernel_type='ball')
-	# defaults kernel_radius to 1/2 grid_spacing for 0th centerfinder
-	cf0.set_kernel_radius(cf0.grid_spacing / 2)
-	if args.kernel_radius0:
-		cf0.set_kernel_radius(args.kernel_radius0)
-	if args.show_kernel0:
-		cf0.set_show_kernel(args.show_kernel0)
-	if args.step_kernel0:
-		cf0.set_kernel_type('step', args.step_kernel0)
-	elif args.gaussian_kernel0:
-		cf0.set_kernel_type('gaussian', args.gaussian_kernel0)
-	elif args.wavelet_kernel0:
-		cf0.set_kernel_type('wavelet', args.wavelet_kernel0)
-	elif args.custom_kernel0:
-		cf0.set_kernel_type('custom', args.custom_kernel0)
-	if args.vote_threshold0:
-		cf0.set_vote_threshold(args.vote_threshold0)
-
-	# legacy, customizes the background subtraction process
-	if args.density_contrast0:
-		do_dencon0 = True
-		if len(args.density_contrast0)==0:
-			keep_neg_wts0 = True
-		else:
-			keep_neg_wts0 = False
-	else:
-		do_dencon0 = True
-		keep_neg_wts0 = True
-	dencon_args0 = (do_dencon0, keep_neg_wts0)
-	# runs the centerfinding algorithm
-	cf0.make_grids(dencon=dencon_args0, overden=args.overdensity0)
-	# if self-correlation, keeps density and randoms so it calculates only once
-	if not args.input_file_0:
-		density_grid = cf0.get_density_grid()
-		randoms_grid = cf0.get_randoms_grid()
-	# there's no need for convolving 
-	# if the whole kernel is just one cell
-	if cf0.kernel_radius == cf0.grid_spacing/2:
-		W0 = cf0.get_density_grid()
-		B0 = cf0.get_randoms_grid()
-	else:
-		cf0.make_convolved_grids()
-		W0 = cf0.get_centers_grid()
-		B0 = cf0.get_background_grid()
-	del cf0
-
-
-	# creates and customizes instance of 1st CenterFinder object
-	cf1 = CenterFinder(args.file1, args.weighted_input1, 
-		args.params_file, args.save, args.verbose)
-	if args.kernel_radius1:
-		cf1.set_kernel_radius(args.kernel_radius1)
-	if args.show_kernel1:
-		cf1.set_show_kernel(args.show_kernel1)
-	if args.step_kernel1:
-		cf1.set_kernel_type('step', args.step_kernel1)
-	elif args.gaussian_kernel1:
-		cf1.set_kernel_type('gaussian', args.gaussian_kernel1)
-	elif args.wavelet_kernel1:
-		cf1.set_kernel_type('wavelet', args.wavelet_kernel1)
-	elif args.custom_kernel1:
-		cf1.set_kernel_type('custom', args.custom_kernel1)
-	if args.vote_threshold1:
-		cf1.set_vote_threshold(args.vote_threshold1)
-	
-	if args.density_contrast1:
-		do_dencon1 = True
-		if len(args.density_contrast1)==0:
-			keep_neg_wts1 = True
-		else:
-			keep_neg_wts1 = False
-	else:
-		do_dencon1 = True
-		keep_neg_wts1 = True
-	dencon_args1 = (do_dencon1, keep_neg_wts1)
-	# doesn't recalculate randoms and density grid if self-cor
-	if not args.input_file_0:
-		cf1.set_density_grid(density_grid)
-		cf1.set_randoms_grid(randoms_grid)
-	# runs the centerfinding algorithm again if x-cor
-	else:
-		cf1.make_grids(dencon=dencon_args1, overden=args.overdensity1)
-
-
+	# sets up output folder
 	savename = 'out_conker_{}_{}/'.format(filename1, filename0)
 	try:
 		os.mkdir(savename)
 	except FileExistsError:
 		pass
 
+	# sets up correlator object for run
+	corr = Correlator(args.order, args.file1, file0=args.file0,
+		params_file=args.params_file, printout=args.verbose,
+		save=args.save, savename=savename)
+
+
+	# creates and customizes instance of CenterFinder object 0
+	file0 = args.file1 if not args.file0 else args.file0
+	cf0 = CenterFinder(file0, args.weighted_input0, 
+		args.params_file, args.save, args.verbose, kernel_type='ball')
+	corr.set_cf0(cf0)
+	corr.make_cf0(args)
+	# del cf0
+
+	# creates and customizes instance of CenterFinder object 1
+	cf1 = CenterFinder(args.file1, args.weighted_input1, 
+		args.params_file, args.save, args.verbose)
+	corr.set_cf1(cf1)
+	corr.make_cf1(args)
+	# del cf1
+
+	# runs requested correlation
 	if args.scan:
-		start, end = args.scan
-		corrfunc = {r: None for r in range(start, end, cf1.grid_spacing)}
+		corr.scan_correlate(args)
 
-		for r in corrfunc.keys():
-			cf1.set_kernel_radius(r)
-			cf1.make_convolved_grids()
-			W1 = cf1.get_centers_grid()
-			B1 = cf1.get_background_grid()
-			cf1.cleanup()
-
-			W = W0 * W1
-			B = B0 * B1
-			if args.save:
-				np.save(savename + f'W_r1_{r}_r0_{args.kernel_radius0}.npy', W)
-				np.save(savename + f'B_r1_{r}_r0_{args.kernel_radius0}.npy', B)
-
-			corrfunc[r] = np.sum(W) / np.sum(B)
-
-		del cf1
-
-		separation, correlation = list(corrfunc.keys()), list(corrfunc.values())
-		print(separation)
-		print(correlation)
-		np.save(savename + f'separation_range_{separation[0]}_{separation[-1]}.npy', separation)
-		np.save(savename + f'correlation_range_{separation[0]}_{separation[-1]}.npy', correlation)
-		import matplotlib.pyplot as plt
-		plt.plot(separation, correlation)
-		plt.savefig(savename + f'conker_scan_{separation[0]}_{separation[-1]}.png')
-
-	# else:
+	else:
+		pass
 	# 	cf1.make_convolved_grids()
 	# 	W1 = cf1.get_centers_grid()
 	# 	del cf1
