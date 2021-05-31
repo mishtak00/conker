@@ -15,6 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses.
 """
 
+import sys
 import numpy as np
 from .centerfinder import CenterFinder
 
@@ -38,6 +39,12 @@ class Correlator:
 		printout: bool = False
 		):
 
+		try:
+			assert order >= 2
+		except AssertionError:
+			print('AssertionError: '\
+				f'Correlation order has to be >= 2, was given {order}')
+			sys.exit(1)
 
 		self.order = order
 		self.file1 = file1
@@ -178,6 +185,29 @@ class Correlator:
 				overden=args.overdensity1)
 
 
+	@staticmethod
+	def _reduce_mult_till_order(cf1: CenterFinder, order: int) \
+		-> (np.ndarray, np.ndarray):
+		"""
+		Reduction that maps high order corrfunc over same object.
+		Note this acts like a reduction but the args list is
+		created dynamically, i.e. W1, W1-1, W1-2 ... W1-(n-2)
+		Strictly for use on Correlator instance's cf1 object.
+		"""
+		W1_prod = cf1.get_centers_grid()
+		B1_prod = cf1.get_background_grid()
+		for i in range(1, order-1):
+			W1_prod *= (W1_prod - i)
+			B1_prod *= (B1_prod - i)
+
+		return W1_prod, B1_prod
+
+	
+
+	def _npcf(self):
+		pass
+
+
 	def correlate(self):
 		pass
 
@@ -189,12 +219,13 @@ class Correlator:
 		for r in self.corrfunc.keys():
 			self.cf1.set_kernel_radius(r)
 			self.cf1.make_convolved_grids()
-			self.W1 = self.cf1.get_centers_grid()
-			self.B1 = self.cf1.get_background_grid()
+			# self.W1 = self.cf1.get_centers_grid()
+			# self.B1 = self.cf1.get_background_grid()
+			self.W1_prod, self.B1_prod = Correlator._reduce_mult_till_order(self.cf1, self.order)
 			self.cf1.cleanup()
 
-			W = self.W0 * self.W1
-			B = self.B0 * self.B1
+			W = self.W0 * self.W1_prod
+			B = self.B0 * self.B1_prod
 			if args.save:
 				np.save(self.savename + f'W_r1_{r}_r0_{args.kernel_radius0}.npy', W)
 				np.save(self.savename + f'B_r1_{r}_r0_{args.kernel_radius0}.npy', B)
@@ -210,14 +241,14 @@ class Correlator:
 		if self.printout:
 			print('Separation array:\n', separation)
 			print('Correlation array:\n', correlation)
-		np.save(self.savename + 'separation_range_{}_{}.npy'\
-			.format(separation[0], separation[-1]), separation)
-		np.save(self.savename + 'correlation_range_{}_{}.npy'\
-			.format(separation[0], separation[-1]), correlation)
+		np.save(self.savename + '{}pcf_separation_range_{}_{}.npy'\
+			.format(self.order, separation[0], separation[-1]), separation)
+		np.save(self.savename + '{}pcf_correlation_range_{}_{}.npy'\
+			.format(self.order, separation[0], separation[-1]), correlation)
 		import matplotlib.pyplot as plt
 		plt.plot(separation, correlation)
-		plt.savefig(self.savename + 'conker_scan_{}_{}.png'\
-			.format(separation[0], separation[-1]))
+		plt.savefig(self.savename + '{}pcf_conker_scan_{}_{}.png'\
+			.format(self.order, separation[0], separation[-1]))
 
 
 
