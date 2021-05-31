@@ -208,8 +208,8 @@ class Correlator:
 		separation = list(self.corrfunc.keys())
 		correlation = list(self.corrfunc.values())
 		if self.printout:
-			print('Separation array:\n' + separation)
-			print('Correlation array:\n' + correlation)
+			print('Separation array:\n', separation)
+			print('Correlation array:\n', correlation)
 		np.save(self.savename + 'separation_range_{}_{}.npy'\
 			.format(separation[0], separation[-1]), separation)
 		np.save(self.savename + 'correlation_range_{}_{}.npy'\

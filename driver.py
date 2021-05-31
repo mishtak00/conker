@@ -18,7 +18,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses.
 import os
 from argparse import ArgumentParser
 from src.correlator import Correlator
-from src.centerfinder import CenterFinder
 import numpy as np
 
 
