@@ -48,8 +48,8 @@ class Correlator:
 
 		self.order = order
 		self.file1 = file1
-		# self-correlation on default
-		self.type = 'self'
+		# auto-correlation on default
+		self.type = 'auto'
 		# cross-correlation if 2nd file provided
 		if file0:
 			self.type = 'cross'
@@ -73,8 +73,8 @@ class Correlator:
 		self.randoms_grid: np.ndarray = None
 		self.W0: np.ndarray = None
 		self.B0: np.ndarray = None
-		self.W1: np.ndarray = None
-		self.B1: np.ndarray = None
+		self.W1_prod: np.ndarray = None
+		self.B1_prod: np.ndarray = None
 		self.corrfunc: dict = None
 
 
@@ -130,8 +130,8 @@ class Correlator:
 		# runs the centerfinding algorithm
 		self.cf0.make_grids(dencon=self.dencon_args0, 
 			overden=args.overdensity0)
-		# if self-correlation, keeps density and randoms so it calculates only once
-		if self.type == 'self':
+		# if auto-correlation, keeps density and randoms so it calculates only once
+		if self.type == 'auto':
 			self.density_grid = self.cf0.get_density_grid()
 			self.randoms_grid = self.cf0.get_randoms_grid()
 		# there's no need for convolving 
@@ -175,8 +175,8 @@ class Correlator:
 	def make_cf1(self, args):
 		# legacy, customizes the cf object and the bckgrnd subtraction
 		self._customize_cf1(args)
-		# doesn't recalculate randoms and density grid if self-cor
-		if self.type == 'self':
+		# doesn't recalculate randoms and density grid if auto-cor
+		if self.type == 'auto':
 			self.cf1.set_density_grid(self.density_grid)
 			self.cf1.set_randoms_grid(self.randoms_grid)
 		# runs the centerfinding algorithm again if x-cor
@@ -202,53 +202,71 @@ class Correlator:
 
 		return W1_prod, B1_prod
 
-	
 
-	def _npcf(self):
-		pass
+	def _correlate(self):
+		self.cf1.make_convolved_grids()
+		self.W1_prod, self.B1_prod = Correlator\
+			._reduce_mult_till_order(self.cf1, self.order)
+		self.cf1.cleanup()
+		W = self.W0 * self.W1_prod
+		B = self.B0 * self.B1_prod
+		if self.save:
+			np.save(self.savename + '{}pcf_W_r1_{}_r0_{}.npy'\
+				.format(self.order, r, args.kernel_radius0), W)
+			np.save(self.savename + '{}pcf_B_r1_{}_r0_{}.npy'\
+				.format(self.order, r, args.kernel_radius0), B)
+		W = np.sum(W)
+		B = np.sum(B)
+
+		return W, B
 
 
-	def correlate(self):
-		pass
+	def save_single(self):
+		separation = list(self.corrfunc.keys())
+		correlation = list(self.corrfunc.values())
+		if self.printout:
+			print('Separation value:\n', separation)
+			print('Correlation value:\n', correlation)
+		np.save(self.savename + '{}pcf_sep_{}.npy'\
+			.format(self.order, separation[0]), separation)
+		np.save(self.savename + '{}pcf_corr_{}.npy'\
+			.format(self.order, separation[0]), correlation)
 
 
-	def scan_correlate(self, args):
-		start, end = args.scan
-		self.corrfunc = {r: None for r in range(start, end, self.cf1.grid_spacing)}
+	def single_correlate(self):
+		s = self.cf1.kernel_radius
+		self.corrfunc = {s: None}
+		W, B = self._correlate()
+		self.corrfunc[s] = W / B
+		self.save_single()
 
-		for r in self.corrfunc.keys():
-			self.cf1.set_kernel_radius(r)
-			self.cf1.make_convolved_grids()
-			# self.W1 = self.cf1.get_centers_grid()
-			# self.B1 = self.cf1.get_background_grid()
-			self.W1_prod, self.B1_prod = Correlator._reduce_mult_till_order(self.cf1, self.order)
-			self.cf1.cleanup()
 
-			W = self.W0 * self.W1_prod
-			B = self.B0 * self.B1_prod
-			if args.save:
-				np.save(self.savename + f'W_r1_{r}_r0_{args.kernel_radius0}.npy', W)
-				np.save(self.savename + f'B_r1_{r}_r0_{args.kernel_radius0}.npy', B)
-
-			self.corrfunc[r] = np.sum(W) / np.sum(B)
-
-		del W, B
-
-		# del cf1
-
+	def save_scan(self):
 		separation = list(self.corrfunc.keys())
 		correlation = list(self.corrfunc.values())
 		if self.printout:
 			print('Separation array:\n', separation)
 			print('Correlation array:\n', correlation)
-		np.save(self.savename + '{}pcf_separation_range_{}_{}.npy'\
+		np.save(self.savename + '{}pcf_sep_range_{}_{}.npy'\
 			.format(self.order, separation[0], separation[-1]), separation)
-		np.save(self.savename + '{}pcf_correlation_range_{}_{}.npy'\
+		np.save(self.savename + '{}pcf_corr_range_{}_{}.npy'\
 			.format(self.order, separation[0], separation[-1]), correlation)
 		import matplotlib.pyplot as plt
 		plt.plot(separation, correlation)
 		plt.savefig(self.savename + '{}pcf_conker_scan_{}_{}.png'\
 			.format(self.order, separation[0], separation[-1]))
+
+
+	def scan_correlate(self, scan_args):
+		start, end = scan_args
+		self.corrfunc = {s: None for s in range(start, end, self.cf1.grid_spacing)}
+
+		for s in self.corrfunc.keys():
+			self.cf1.set_kernel_radius(s)
+			W, B = self._correlate()
+			self.corrfunc[s] = W / B
+
+		self.save_scan()
 
 
 

@@ -1,5 +1,5 @@
 """
-Copyright (C) 2020 Gebri Mishtaku
+Copyright (C) 2021 Gebri Mishtaku
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -157,7 +157,7 @@ class CenterFinder:
 				print('Overdensity calculation completed successfully...')
 
 		if self.printout:
-			print('Minimum and maximum values of density field grid cells: '\
+			print('Minimum and maximum values of density field grid cells:\n',
 				'[{}, {}]'.format(self.density_grid.min(), self.density_grid.max()))
 
 
