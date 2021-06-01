@@ -207,14 +207,16 @@ class Correlator:
 		self.cf1.make_convolved_grids()
 		self.W1_prod, self.B1_prod = Correlator\
 			._reduce_mult_till_order(self.cf1, self.order)
-		self.cf1.cleanup()
 		W = self.W0 * self.W1_prod
 		B = self.B0 * self.B1_prod
 		if self.save:
+			r1, r0 = self.cf1.kernel_radius, self.cf0.kernel_radius
 			np.save(self.savename + '{}pcf_W_r1_{}_r0_{}.npy'\
-				.format(self.order, r, args.kernel_radius0), W)
+					.format(self.order, r1, r0), W)
 			np.save(self.savename + '{}pcf_B_r1_{}_r0_{}.npy'\
-				.format(self.order, r, args.kernel_radius0), B)
+					.format(self.order, r1, r0), B)
+		self.cf1.cleanup()
+
 		W = np.sum(W)
 		B = np.sum(B)
 

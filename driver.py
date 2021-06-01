@@ -49,7 +49,6 @@ def main():
 		params_file=args.params_file, printout=args.verbose,
 		save=args.save, savename=savename)
 
-
 	# creates and customizes instance of CenterFinder object 0
 	file0 = args.file1 if not args.file0 else args.file0
 	cf0 = CenterFinder(file0, args.weighted_input0, 
@@ -63,7 +62,7 @@ def main():
 	corr.set_cf1(cf1)
 	corr.make_cf1(args)
 
-	# runs requested correlation
+	# runs requested correlation and saves output
 	# scan command overrides single command
 	if args.scan:
 		corr.scan_correlate(args.scan)

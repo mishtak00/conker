@@ -24,7 +24,6 @@ from scipy.interpolate import InterpolatedUnivariateSpline
 
 
 def load_hyperparameters(params_file: str):
-	"""Returns hyperparameters loaded from json file. """
 	with open(params_file, 'r') as params:
 		hp = json.load(params)
 		c = hp['c']  # km/s
@@ -38,8 +37,9 @@ def load_hyperparameters(params_file: str):
 		else:
 			Omega_L = hp['Omega_L']
 		grid_spacing = hp['grid_spacing']  # h-1Mpc
+		rounding_precision = hp['rounding_precision']
 	cosmology = h_, c_over_H0, Omega_M, Omega_K, Omega_L
-	return cosmology, grid_spacing
+	return cosmology, grid_spacing, rounding_precision
 
 
 def load_data(filename: str) -> (np.recarray,)*3:

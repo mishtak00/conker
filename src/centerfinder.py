@@ -43,8 +43,6 @@ class CenterFinder:
 		vote_threshold: float = -inf
 		):
 
-		self.float_precision = 5
-
 		self.kernel_radius = kernel_radius
 		self.kernel_type = kernel_type
 		self.kernel_args = kernel_args
@@ -67,10 +65,12 @@ class CenterFinder:
 			self.G_ra, self.G_dec, self.G_redshift = load_data(galaxy_file)
 			self.G_weights = np.ones(len(self.G_ra), dtype=float)
 		else:
-			self.G_ra, self.G_dec, self.G_redshift, self.G_weights = load_data_weighted(galaxy_file)
+			self.G_ra, self.G_dec, self.G_redshift, self.G_weights \
+				= load_data_weighted(galaxy_file)
 
 		# gets cosmology and other hyperparameters
-		self.cosmology, self.grid_spacing = load_hyperparameters(params_file)
+		self.cosmology, self.grid_spacing, self.rounding_precision \
+			= load_hyperparameters(params_file)
 		# calculates lookup tables for fast conversion from r to z and vice versa
 		self.LUT_radii, self.LUT_redshifts = interpolate_r_z(self.G_redshift.min(), 
 			self.G_redshift.max(), self.cosmology)
@@ -174,10 +174,9 @@ class CenterFinder:
 		# this scans the kernel over the whole volume of the galaxy density grid
 		# calculates the tensor inner product of the two at each step
 		# and finally stores this value as the number of voters per that bin in the centers grid
-		self.centers_grid = fftconvolve(self.density_grid, self.kernel.get_grid(), mode='same')
-		# TODO: finalize infinitesimal value rounding
-		# np.around(self.centers_grid, decimals=self.float_precision, out=self.centers_grid)
-		self.centers_grid[np.abs(self.centers_grid) < 10**(-self.float_precision)] = 0.0
+		self.centers_grid = np.round(
+			fftconvolve(self.density_grid, self.kernel.get_grid(), mode='same'),
+			decimals = self.rounding_precision)
 		
 		if self.printout:
 			print('Convolution of density grid completed successfully...')
@@ -198,10 +197,9 @@ class CenterFinder:
 		"""
 
 		# needed for background in conker
-		self.background_grid = fftconvolve(self.randoms_grid, self.kernel.get_grid(), mode='same')
-		# TODO: finalize infinitesimal value rounding
-		# np.around(self.background_grid, decimals=self.float_precision, out=self.background_grid)
-		self.background_grid[np.abs(self.background_grid) < 10**(-self.float_precision)] = 0.0
+		self.background_grid = np.round(
+			fftconvolve(self.randoms_grid, self.kernel.get_grid(), mode='same'),
+			decimals = self.rounding_precision)
 		
 		if self.printout:
 			print('Convolution of randoms grid completed successfully...')
@@ -320,22 +318,6 @@ class CenterFinder:
 			print('N_tot_observed = N_tot_alpha_delta = N_tot_r:', 
 				N_tot == np.sum(alpha_delta_grid) == np.sum(r_grid))
 
-		# start = time.time()
-		# expected_grid = np.array([[[alpha_delta_grid[sky_coords_grid[i, j, k, 0], sky_coords_grid[i, j, k, 1]]
-		# 							 * r_grid[sky_coords_grid[i, j, k, 2]]
-		# 							for k in range(N_bins_z)]
-		# 						   for j in range(N_bins_y)]
-		# 						  for i in range(N_bins_x)])
-		# end = time.time()
-		# print(f'\nexpected_grid 1 took time: {end-start} seconds\n')
-
-		# expected_grid /= N_tot  # normalization
-		# expected_grid *= vol_adjust_ratio_grid  # volume adjustment
-		# if self.printout:
-		# 	print('Expected grid shape:', expected_grid.shape)
-		# 	print('Maximum number of expected votes:', expected_grid.max())
-		# 	print('Minimum number of expected votes:', expected_grid.min())
-
 		start = time.time()
 		i = np.arange(N_bins_x)[:,None,None]
 		j = np.arange(N_bins_y)[None,:,None]
@@ -395,45 +377,6 @@ class CenterFinder:
 
 		return vol_adjust_ratio_grid, d_r, d_alpha, d_delta, N_bins_r, N_bins_alpha, N_bins_delta
 
-
-
-	# def _alpha_delta_r_projections_from_grid(self, grid: np.ndarray, N_bins_x: int, N_bins_y: int, N_bins_z: int, 
-	# 	sky_coords_grid: np.ndarray, N_bins_alpha: int, N_bins_delta: int, N_bins_r: int) -> (np.ndarray, np.ndarray):
-
-	# 	alpha_delta_grid = np.zeros((N_bins_alpha, N_bins_delta))
-	# 	r_grid = np.zeros((N_bins_r,))
-	# 	for i in range(N_bins_x):
-	# 		for j in range(N_bins_y):
-	# 			for k in range(N_bins_z):
-	# 				alpha_delta_grid[sky_coords_grid[i, j, k, 0], sky_coords_grid[i, j, k, 1]] += grid[i, j, k]
-	# 				r_grid[sky_coords_grid[i, j, k, 2]] += grid[i, j, k]
-
-	# 	return alpha_delta_grid, r_grid
-
-
-	# def _alpha_delta_r_projections_from_grid(self, grid: np.ndarray, N_bins_x: int, N_bins_y: int, N_bins_z: int, 
-	# 	sky_coords_grid: np.ndarray, N_bins_alpha: int, N_bins_delta: int, N_bins_r: int) -> (np.ndarray, np.ndarray):
-
-	# 	i = np.arange(N_bins_x)[:,None,None]
-	# 	j = np.arange(N_bins_y)[None,:,None]
-	# 	k = np.arange(N_bins_z)[None,None,:]
-	# 	alpha_delta_grid = np.zeros((N_bins_alpha, N_bins_delta))
-	# 	r_grid = np.zeros((N_bins_r,))
-
-	# 	alpha_delta_grid[sky_coords_grid[i,j,k,0], sky_coords_grid[i,j,k,1]] += grid[i,j,k]
-	# 	r_grid[sky_coords_grid[i,j,k,2]] += grid[i,j,k]
-
-	# 	return alpha_delta_grid, r_grid
-
-
-	# def _alpha_delta_r_projections_from_grid(self, grid: np.ndarray, N_bins_x: int, N_bins_y: int, N_bins_z: int, 
-	# 	sky_coords_grid: np.ndarray, N_bins_alpha: int, N_bins_delta: int, N_bins_r: int) -> (np.ndarray, np.ndarray):
-
-	# 	alpha_delta_grid, _, _ = np.histogram2d(self.G_ra, self.G_dec, 
-	# 								bins=(N_bins_alpha, N_bins_delta), weights=self.G_weights)
-	# 	r_grid, _ = np.histogram(self.G_radii, bins=N_bins_r, weights=self.G_weights)
-
-	# 	return alpha_delta_grid, r_grid
 
 
 	def _alpha_delta_r_projections_from_grid(self, grid: np.ndarray, N_bins_x: int, N_bins_y: int, N_bins_z: int, 

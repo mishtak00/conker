@@ -27,10 +27,10 @@ class Parser(ArgumentParser):
 
 		# core conker variables
 		self.add_argument('file1', metavar='INPUT_FILE_1', type=str, 
-			help='Name of .fits file with the input data.')
+			help='Name of .fits file with the input catalog.')
 		self.add_argument('-f0', '--file0', type=str, default=None,
-			help='Name of .fits file with the input data.'\
-					'Self-correlation if ommitted. Cross-correlation if present.')
+			help='Name of .fits file with other input catalog. '\
+					'Auto-correlation if ommitted. Cross-correlation if present.')
 		self.add_argument('-n', '--order', type=int, default=2,
 			help='Correlation order wanted.')
 		self.add_argument('-p', '--params_file', type=str, default='params.json', 
