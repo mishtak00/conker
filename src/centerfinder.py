@@ -77,11 +77,12 @@ class CenterFinder:
 
 		self.G_radii = self.LUT_radii(self.G_redshift)
 
-		self.randoms_grid = None
-		self.density_grid = None
+		self.randoms_grid: np.ndarray = None
+		self.density_grid: np.ndarray = None
 		self.density_grid_edges = None
-		self.background_grid = None
-		self.centers_grid = None
+		self.kernel: np.ndarray = None
+		self.background_grid: np.ndarray = None
+		self.centers_grid: np.ndarray = None
 
 
 	def __str__(self):
@@ -111,31 +112,48 @@ class CenterFinder:
 		self.vote_threshold = vt
 
 
-
-	def _make_grids(self, dencon: tuple = (False, False), overden: bool = False):
-		"""
-		Creates both density grid and randoms grid.
-		"""
-
-		xyzs = sky2cartesian(self.G_ra, self.G_dec, self.G_redshift, self.LUT_radii) # galaxy x, y and z coordinates
+	def make_histo_grid(self):
+		xyzs = sky2cartesian(self.G_ra, self.G_dec, self.G_redshift, self.LUT_radii) # galaxy x, y and z coords
 		self.galaxies_cartesian = np.array(xyzs).T  # each galaxy is represented by (x, y, z)
 
-		# gets the 3d histogram (density_grid) and the grid bin coordintes in cartesian (grid_edges)
-		bin_counts_3d = np.array([np.ceil((xyzs[i].max() - xyzs[i].min()) / self.grid_spacing) 
-									for i in range(len(xyzs))], dtype=int)
+		# for cf1 and cf0 types in conker
+		if not self.density_grid_edges:
+			# gets the 3d histogram (density_grid) and the grid bin coordintes in cartesian (grid_edges)
+			bin_counts_3d = np.array([np.ceil((xyzs[i].max() - xyzs[i].min()) / self.grid_spacing) 
+										for i in range(len(xyzs))], dtype=int)
+			# histograms the data points in real space with given weights
+			self.density_grid, self.density_grid_edges = np.histogramdd(
+				self.galaxies_cartesian, 
+				bins=bin_counts_3d, 
+				weights=self.G_weights
+				)
 
-		# histograms the data points in real space with given weights
-		self.density_grid, self.density_grid_edges = np.histogramdd(self.galaxies_cartesian, 
-			bins=bin_counts_3d, weights=self.G_weights)
+		# for cfR, cf1 (cf1 w/ x-corr, diff bounds only) types in conker
+		else:
+			self.density_grid, self.density_grid_edges = np.histogramdd(
+				self.galaxies_cartesian,
+				bins=self.density_grid_edges,
+				weights=self.G_weights
+				)
 
 		if self.printout:
 			print('Histogramming completed successfully...')
-			print('Density grid shape:', self.density_grid.shape)
+			print('Histogram grid shape:', self.density_grid.shape)
 
-		# makes randoms grid and subtracts it from the density grid
+		return np.sum(self.density_grid)
+
+
+	def make_randoms_grid(self):
+		if not self.randoms_grid:
+			self.randoms_grid = self._project_and_sample(
+				self.density_grid, 
+				self.density_grid_edges
+				)
+
+
+	def make_density_grid(self, dencon, overden):
+		# density contrast: subtracts randoms grid (non-conv background)
 		if dencon[0]:
-			if not self.randoms_grid:
-				self.randoms_grid = self._project_and_sample(self.density_grid, self.density_grid_edges)
 			self.density_grid -= self.randoms_grid
 
 			# keep or discard negative valued weights
@@ -158,8 +176,7 @@ class CenterFinder:
 
 		if self.printout:
 			print('Minimum and maximum values of density field grid cells:\n',
-				'[{}, {}]'.format(self.density_grid.min(), self.density_grid.max()))
-
+				'[{}, {}]'.format(self.density_grid.min(), self.density_grid.max()))		
 
 
 	def _convolve_density_grid(self):
@@ -260,7 +277,8 @@ class CenterFinder:
 			print('Sum total of weights:', N_tot)
 
 		start = time.time()
-		# get volume adjustment grid, the differentials in sky coordinate dimensions and the number of bins in each dimension
+		# get volume adjustment grid, the differentials in sky coordinate dimensions 
+		# and the number of bins in each dimension
 		vol_adjust_ratio_grid, d_r, d_alpha, d_delta, N_bins_r, N_bins_alpha, N_bins_delta = \
 			self._volume_adjustment(bin_centers_radii, bin_centers_ra, bin_centers_dec, grid.shape)
 		end = time.time()
@@ -311,10 +329,10 @@ class CenterFinder:
 		if self.printout:
 			print('Shape of alpha-delta grid:', alpha_delta_grid.shape)
 			print('Shape of r grid:', r_grid.shape)
-			print('Maximum number of voters per single bin in alpha-delta grid:', alpha_delta_grid.max())
-			print('Minimum number of voters per single bin in alpha-delta grid:', alpha_delta_grid.min())
-			print('Maximum number of voters per single bin in r grid:', r_grid.max())
-			print('Minimum number of voters per single bin in r grid:', r_grid.min())
+			print('Maximum value per single bin in alpha-delta grid:', alpha_delta_grid.max())
+			print('Minimum value per single bin in alpha-delta grid:', alpha_delta_grid.min())
+			print('Maximum value per single bin in r grid:', r_grid.max())
+			print('Minimum value per single bin in r grid:', r_grid.min())
 			print('N_tot_observed = N_tot_alpha_delta = N_tot_r:', 
 				N_tot == np.sum(alpha_delta_grid) == np.sum(r_grid))
 
@@ -322,22 +340,22 @@ class CenterFinder:
 		i = np.arange(N_bins_x)[:,None,None]
 		j = np.arange(N_bins_y)[None,:,None]
 		k = np.arange(N_bins_z)[None,None,:]
-		expected_grid = alpha_delta_grid[sky_coords_grid[i,j,k,0], sky_coords_grid[i,j,k,1]] \
+		randoms_grid = alpha_delta_grid[sky_coords_grid[i,j,k,0], sky_coords_grid[i,j,k,1]] \
 						* r_grid[sky_coords_grid[i,j,k,2]]
 		end = time.time()
-		print(f'\nexpected_grid 2 took time: {end-start} seconds\n')
+		print(f'\nrandoms_grid took time: {end-start} seconds\n')
 
-		expected_grid /= N_tot  # normalization
-		expected_grid *= vol_adjust_ratio_grid  # volume adjustment
+		randoms_grid /= N_tot  # normalization
+		randoms_grid *= vol_adjust_ratio_grid  # volume adjustment
 		if self.printout:
-			print('Expected grid shape:', expected_grid.shape)
-			print('Maximum number of expected votes:', expected_grid.max())
-			print('Minimum number of expected votes:', expected_grid.min())
+			print('Randoms grid shape:', randoms_grid.shape)
+			print('Maximum value in randoms grid bin:', randoms_grid.max())
+			print('Minimum value in randoms grid bin:', randoms_grid.min())
 
-		# if self.save:
-		# 	np.save(self.savename + "_exp_grid.npy", expected_grid)
+		if self.save:
+			np.save(self.savename + "_randoms_grid.npy", randoms_grid)
 
-		return expected_grid
+		return randoms_grid
 
 
 
@@ -366,7 +384,8 @@ class CenterFinder:
 		dV_ang = d_alpha * cos_delta * d_delta * r_sqr * d_r
 		# euclidean volume differential
 		dV_xyz = self.grid_spacing ** 3
-		# volume adjustment ratio grid; contains the volume adjustment ratio per each bin in the expected grid
+		# volume adjustment ratio grid; contains the volume adjustment ratio 
+		# per each bin in the expected grid
 		vol_adjust_ratio_grid = (dV_xyz / dV_ang).reshape(observed_grid_shape)
 
 		if self.printout:
@@ -379,12 +398,21 @@ class CenterFinder:
 
 
 
-	def _alpha_delta_r_projections_from_grid(self, grid: np.ndarray, N_bins_x: int, N_bins_y: int, N_bins_z: int, 
-		sky_coords_grid: np.ndarray, N_bins_alpha: int, N_bins_delta: int, N_bins_r: int) -> (np.ndarray, np.ndarray):
+	def _alpha_delta_r_projections_from_grid(self, 
+		density_grid: np.ndarray, 
+		N_bins_x: int, N_bins_y: int, N_bins_z: int, 
+		sky_coords_grid: np.ndarray, 
+		N_bins_alpha: int, N_bins_delta: int, N_bins_r: int) \
+		-> (np.ndarray, np.ndarray):
 
-		alpha_delta_grid, _, _ = np.histogram2d(sky_coords_grid[:,:,:,0].ravel(), sky_coords_grid[:,:,:,1].ravel(), 
-												bins=(N_bins_alpha, N_bins_delta), weights=grid.ravel())
-		r_grid, _ = np.histogram(sky_coords_grid[:,:,:,2].ravel(), bins=N_bins_r, weights=grid.ravel())
+		alpha_delta_grid, _, _ = np.histogram2d(sky_coords_grid[:,:,:,0].ravel(), 
+												sky_coords_grid[:,:,:,1].ravel(), 
+												bins=(N_bins_alpha, N_bins_delta), 
+												weights=density_grid.ravel())
+
+		r_grid, _ = np.histogram(sky_coords_grid[:,:,:,2].ravel(), 
+								bins=N_bins_r, 
+								weights=density_grid.ravel())
 
 		return alpha_delta_grid, r_grid
 
@@ -402,6 +430,14 @@ class CenterFinder:
 
 	def get_density_grid(self):
 		return self.density_grid
+
+
+	def set_density_grid_edges(self, dge):
+		self.density_grid_edges = dge
+
+
+	def get_density_grid_edges(self):
+		return self.density_grid_edges
 
 
 	def set_randoms_grid(self, rg):
@@ -428,11 +464,18 @@ class CenterFinder:
 		return self.background_grid
 
 
-	def make_grids(self, dencon: bool, overden: bool):
-		self._make_grids(dencon=dencon, overden=overden)
+	def make_grids(self, 
+		dencon: (bool,bool) = (False, False), 
+		overden: bool = False
+		):
+		"""Creates density and randoms grids. """
+		self.make_histo_grid()
+		self.make_randoms_grid()
+		self.make_density_grid(dencon, overden)
 
 
 	def make_convolved_grids(self):
+		"""Creates convolved density (signal) and background grids. """
 		self._convolve_density_grid()
 		self._convolve_randoms_grid()
 
@@ -462,11 +505,13 @@ class CenterFinder:
 			delattr(self, 'centers_grid')
 
 		# calculates center coords to be exactly at the center of their respective bins
-		centers_bin_coords = np.array([(self.density_grid_edges[i][:-1] + self.density_grid_edges[i][1:]) / 2 
+		centers_bin_coords = np.array([(self.density_grid_edges[i][:-1] \
+										+ self.density_grid_edges[i][1:]) / 2 
 			for i in range(len(self.density_grid_edges))])
 		if cleanup:
 			delattr(self, 'density_grid_edges')
-		C_xyzs = np.array([centers_bin_coords[i][self.centers_indices[i]] for i in range(len(self.centers_indices))])
+		C_xyzs = np.array([centers_bin_coords[i][self.centers_indices[i]] \
+							for i in range(len(self.centers_indices))])
 		self.C_ra, self.C_dec, self.C_redshift, _ = cartesian2sky(*C_xyzs, self.LUT_redshifts, 
 																self.G_ra.min(), self.G_ra.max())
 		

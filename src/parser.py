@@ -29,10 +29,14 @@ class Parser(ArgumentParser):
 		self.add_argument('file1', metavar='INPUT_FILE_1', type=str, 
 			help='Name of .fits file with the input catalog.')
 		self.add_argument('-f0', '--file0', type=str, default=None,
-			help='Name of .fits file with other input catalog. '\
-					'Auto-correlation if ommitted. Cross-correlation if present.')
+			help='Name of .fits file with other input catalog '\
+			'for cross-correlation. Auto-correlation if ommitted. ')
+		self.add_argument('--randoms_file', type=str, default=None,
+			help='Name of .fits file with randoms catalog for background.')
+		self.add_argument('--randoms_grid', type=str, default=None,
+			help='Name of .npy file containing premade randoms backround grid.')
 		self.add_argument('-n', '--order', type=int, default=2,
-			help='Correlation order wanted.')
+			help='Correlation order wanted. Has to be >= 2.')
 		self.add_argument('-p', '--params_file', type=str, default='params.json', 
 			help='Sets custom hyperparameters file.')
 
@@ -44,6 +48,10 @@ class Parser(ArgumentParser):
 		self.add_argument('--scan', nargs=2, type=int,
 			help='Calculates correlation function from 1st arg (iclusive) '
 					'to 2nd arg (exclusive) by step of grid_spacing.')
+
+		# these define behavior of randoms cf
+		self.add_argument('-wR', '--wtd_randoms', action='store_true',
+			help='Randoms catalog will be interpreted as having weights on 4th col.')
 		
 		# these define 1st kernel behavior
 		self.add_argument('-r1', '--kernel_radius1', type=float, help='Sets kernel radius.')
@@ -64,7 +72,7 @@ class Parser(ArgumentParser):
 		self.add_argument('-t1', '--vote_threshold1', type=float, 
 			help='Centers with number of votes smaller than given argument '\
 			'will be discarded from .fits output.')
-		self.add_argument('-w1', '--weighted_input1', action='store_true',
+		self.add_argument('-w1', '--wtd_input1', action='store_true',
 			help='CenterFinder will try to read a fourth column from input data '\
 			'and interpret said values as weights.')
 		con_or_over1 = self.add_mutually_exclusive_group()
@@ -95,7 +103,7 @@ class Parser(ArgumentParser):
 		self.add_argument('-t0', '--vote_threshold0', type=float, 
 			help='Centers with number of votes smaller than given argument '\
 			'will be discarded from .fits output.')
-		self.add_argument('-w0', '--weighted_input0', action='store_true',
+		self.add_argument('-w0', '--wtd_input0', action='store_true',
 			help='CenterFinder will try to read a fourth column from input data '\
 			'and interpret said values as weights.')
 		con_or_over0 = self.add_mutually_exclusive_group()

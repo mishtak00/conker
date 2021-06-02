@@ -28,11 +28,9 @@ class Correlator:
 		self, 
 		order: int,
 		file1: str, 
-		# wtd1: bool = False,
-		# r1_list: list = None,
 		file0: str = None,
-		# r0: float = 5.,
-		# wtd0: bool = False,
+		fileR: str = None,
+		file_gridR: str = None,
 		params_file: str = 'params.json',
 		save: bool = False,
 		savename: str = None,
@@ -50,10 +48,17 @@ class Correlator:
 		self.file1 = file1
 		# auto-correlation on default
 		self.type = 'auto'
-		# cross-correlation if 2nd file provided
+		# cross-correlation if file0 provided
 		if file0:
 			self.type = 'cross'
 			self.file0 = file0
+		# makes background from randoms catalog
+		if fileR:
+			self.fileR = fileR
+		# loads randoms grid from file
+		if file_gridR:
+			self.file_gridR = file_gridR
+
 		
 		# # correlation order has to match radii given
 		# assert order == len(r1_list) + 1
@@ -65,6 +70,7 @@ class Correlator:
 		self.savename = savename
 		self.printout = printout
 
+		self.cfR: CenterFinder = None
 		self.cf0: CenterFinder = None
 		self.cf1: CenterFinder = None
 		self.dencon_args0: tuple = None
@@ -76,7 +82,16 @@ class Correlator:
 		self.W1_prod: np.ndarray = None
 		self.B1_prod: np.ndarray = None
 		self.corrfunc: dict = None
+		self.ND: float = None
+		self.NR: float = None
 
+
+	def set_cfR(self, cfR):
+		self.cfR = cfR
+
+
+	def get_cfR(self):
+		return self.cfR
 
 
 	def set_cf0(self, cf0):
@@ -95,7 +110,22 @@ class Correlator:
 		return cf1
 
 
+	def make_cfR(self, dge):
+		# cfR only needs to build the randoms grid
+		self.cfR.set_density_grid_edges(dge) # from cf0
+		self.NR = self.cfR.make_histo_grid()
+		self.cfR.make_randoms_grid()
+
+		# normalizes the randoms grid
+		# sets randoms grid for use with cf0 and cf1
+		data2rand_ratio = self.ND / self.NR
+		self.randoms_grid = self.cfR.get_randoms_grid()\
+							* data2rand_ratio
+
+
 	def _customize_cf0(self, args):
+		# defaults kernel_radius to 1/2 grid_spacing for 0th centerfinder
+		self.cf0.set_kernel_radius(self.cf0.grid_spacing / 2)
 		if args.kernel_radius0:
 			self.cf0.set_kernel_radius(args.kernel_radius0)
 		if args.show_kernel0:
@@ -122,23 +152,26 @@ class Correlator:
 		self.dencon_args0 = (do_dencon0, keep_neg_wts0)
 
 
-	def make_cf0(self, args):
-		# defaults kernel_radius to 1/2 grid_spacing for 0th centerfinder
-		self.cf0.set_kernel_radius(self.cf0.grid_spacing / 2)
-		# legacy, customizes the cf object and the bckgrnd subtraction
+	def prep_cf0(self, args):
+		# customizes the cf object and the bckgrnd subtraction
 		self._customize_cf0(args)
-		# runs the centerfinding algorithm
-		self.cf0.make_grids(dencon=self.dencon_args0, 
+		self.ND = self.cf0.make_histo_grid()
+
+
+	def make_cf0(self, args):
+		self.cf0.set_randoms_grid(self.randoms_grid)
+		self.cf0.make_density_grid(dencon=self.dencon_args0,
 			overden=args.overdensity0)
-		# if auto-correlation, keeps density and randoms so it calculates only once
+
+		# if auto-correlation, keeps density so it calculates only once
 		if self.type == 'auto':
 			self.density_grid = self.cf0.get_density_grid()
-			self.randoms_grid = self.cf0.get_randoms_grid()
 		# there's no need for convolving 
 		# if the whole kernel is just one cell
 		if self.cf0.kernel_radius == self.cf0.grid_spacing/2:
 			self.W0 = self.cf0.get_density_grid()
 			self.B0 = self.cf0.get_randoms_grid()
+		# runs the centerfinding algorithm
 		else:
 			self.cf0.make_convolved_grids()
 			self.W0 = self.cf0.get_centers_grid()
@@ -173,14 +206,16 @@ class Correlator:
 
 
 	def make_cf1(self, args):
-		# legacy, customizes the cf object and the bckgrnd subtraction
+		# customizes the cf object and the bckgrnd subtraction
 		self._customize_cf1(args)
-		# doesn't recalculate randoms and density grid if auto-cor
+		self.cf1.set_randoms_grid(self.randoms_grid) # from cfR
+		# doesn't recalculate density grid if auto-cor
 		if self.type == 'auto':
 			self.cf1.set_density_grid(self.density_grid)
-			self.cf1.set_randoms_grid(self.randoms_grid)
 		# runs the centerfinding algorithm again if x-cor
+		# note cf0 boundaries override cf1 if different in x-corr
 		else:
+			self.cf1.set_density_grid_edges(self.cf0.get_density_grid_edges())
 			self.cf1.make_grids(dencon=self.dencon_args1, 
 				overden=args.overdensity1)
 

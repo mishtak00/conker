@@ -15,8 +15,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses.
 """
 
-import os, sys
+import os
 from src.parser import Parser
+from src.utils import remove_ext
 from src.centerfinder import CenterFinder
 from src.correlator import Correlator
 
@@ -30,15 +31,22 @@ def main():
 	parser = Parser()
 	args = parser.parse_args()
 
-	# deletes the .fits extension and
-	# allows for other '.'s in the args.file string
-	filename1 = '.'.join(args.file1.split('.')[:-1])
+	# preps output folder
+	filename1 = remove_ext(args.file1)
+	savename = 'out_conker_f1_{}'.format(filename1)
+
 	if args.file0:
-		filename0 = '.'.join(args.file0.split('.')[:-1])
+		filename0 = remove_ext(args.file0)
+		savename += '_f0_{}'.format(filename0)
 	else:
 		filename0 = filename1
-	# sets up output folder
-	savename = 'out_conker_{}_{}/'.format(filename1, filename0)
+	if args.randoms_file:
+		filenameR = remove_ext(args.randoms_file)
+		savename += '_fR_{}'.format(filenameR)
+	else:
+		filenameR = filename1
+
+	savename += '/'
 	try:
 		os.mkdir(savename)
 	except FileExistsError:
@@ -46,20 +54,37 @@ def main():
 
 	# sets up correlator object for run
 	corr = Correlator(args.order, args.file1, file0=args.file0,
+		fileR=args.randoms_file, file_gridR=args.randoms_grid,
 		params_file=args.params_file, printout=args.verbose,
 		save=args.save, savename=savename)
 
+	# creates and puts cf object instance for randoms (non-conv background)
+	fileR = args.file1 if not args.randoms_file else args.randoms_file
+	cfR = CenterFinder(fileR, args.wtd_randoms,
+		args.params_file, args.save, args.verbose)
+	corr.set_cfR(cfR)
 	# creates and customizes instance of CenterFinder object 0
 	file0 = args.file1 if not args.file0 else args.file0
-	cf0 = CenterFinder(file0, args.weighted_input0, 
+	cf0 = CenterFinder(file0, args.wtd_input0, 
 		args.params_file, args.save, args.verbose, kernel_type='ball')
 	corr.set_cf0(cf0)
-	corr.make_cf0(args)
-
 	# creates and customizes instance of CenterFinder object 1
-	cf1 = CenterFinder(args.file1, args.weighted_input1, 
+	cf1 = CenterFinder(args.file1, args.wtd_input1, 
 		args.params_file, args.save, args.verbose)
 	corr.set_cf1(cf1)
+
+	# histograms input catalog 0 to get boundaries
+	corr.prep_cf0(args)
+
+	# makes the randoms grid with input data boundaries
+	# sets Correlator object's randoms_grid attribute
+	# normalization: ((P_r * P_ad) / NR) * (ND / NR)
+	corr.make_cfR(corr.get_cf0().get_density_grid_edges())
+
+	# makes cf0 with randoms grid from cfR
+	corr.make_cf0(args)
+
+	# makes cf1 with randoms grid from cfR
 	corr.make_cf1(args)
 
 	# runs requested correlation and saves output

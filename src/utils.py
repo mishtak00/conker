@@ -23,6 +23,13 @@ from scipy.interpolate import InterpolatedUnivariateSpline
 
 
 
+def remove_ext(s: str):
+	"""Deletes the .fits extension and
+	allows for other '.'s in the args.file string
+	"""
+	return '.'.join(s.split('.')[:-1])
+
+
 def load_hyperparameters(params_file: str):
 	with open(params_file, 'r') as params:
 		hp = json.load(params)
