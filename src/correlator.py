@@ -296,7 +296,8 @@ class Correlator:
 
 	def scan_correlate(self, scan_args):
 		start, end = scan_args
-		self.corrfunc = {s: None for s in range(start, end, self.cf1.grid_spacing)}
+		self.corrfunc = {s: None for s in \
+			np.arange(start, end, self.cf1.grid_spacing)}
 
 		for s in self.corrfunc.keys():
 			self.cf1.set_kernel_radius(s)
