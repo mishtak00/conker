@@ -43,9 +43,11 @@ class Parser(ArgumentParser):
 		# ancillary behaviors
 		self.add_argument('-s', '--save', action='store_true', 
 			help='Grids and .fits output will be automatically saved to an \'out\' folder.')
+		self.add_argument('-sR', '--save_randoms', action='store_true',
+			help='Randoms background grid will be saved to output folder.')
 		self.add_argument('-v', '--verbose', action='store_true', 
 			help='The progress of CenterFinder will be printed out to standard output.')
-		self.add_argument('--scan', nargs=2, type=int,
+		self.add_argument('--scan', nargs=2, type=float,
 			help='Calculates correlation function from 1st arg (iclusive) '
 					'to 2nd arg (exclusive) by step of grid_spacing.')
 

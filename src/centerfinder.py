@@ -51,9 +51,10 @@ class CenterFinder:
 		self.weighted = wtd
 
 		self.printout = printout
-		self.filename = '.'.join(galaxy_file.split('.')[:-1])
+		self.filename = remove_ext(galaxy_file)
+		self.loadname = 'data/' + galaxy_file
 		self.save = save
-		self.savename = f'out_centerfinder_{self.filename}/'
+		self.savename = f'out_cf_{self.filename}/'
 		if self.save:
 			try:
 				os.mkdir(self.savename)
@@ -62,11 +63,11 @@ class CenterFinder:
 
 		# loads galaxy data arrays
 		if not self.weighted:
-			self.G_ra, self.G_dec, self.G_redshift = load_data(galaxy_file)
+			self.G_ra, self.G_dec, self.G_redshift = load_data(self.loadname)
 			self.G_weights = np.ones(len(self.G_ra), dtype=float)
 		else:
 			self.G_ra, self.G_dec, self.G_redshift, self.G_weights \
-				= load_data_weighted(galaxy_file)
+				= load_data_weighted(self.loadname)
 
 		# gets cosmology and other hyperparameters
 		self.cosmology, self.grid_spacing, self.rounding_precision \
@@ -80,7 +81,7 @@ class CenterFinder:
 		self.randoms_grid: np.ndarray = None
 		self.density_grid: np.ndarray = None
 		self.density_grid_edges = None
-		self.kernel: np.ndarray = None
+		self.kernel: Kernel = None
 		self.background_grid: np.ndarray = None
 		self.centers_grid: np.ndarray = None
 
@@ -99,6 +100,10 @@ class CenterFinder:
 		self.kernel_radius = kr
 
 
+	def get_kernel_r_idx_units(self):
+		return self.kernel.kernel_r_idx_units
+
+
 	def set_kernel_type(self, kt: str, args = None):
 		self.kernel_type = kt
 		self.kernel_args = args
@@ -110,6 +115,54 @@ class CenterFinder:
 
 	def set_vote_threshold(self, vt: float):
 		self.vote_threshold = vt
+
+
+	def set_density_grid(self, dg):
+		self.density_grid = dg
+
+
+	def get_density_grid(self):
+		return self.density_grid
+
+
+	def set_density_grid_edges(self, dge):
+		self.density_grid_edges = dge
+
+
+	def get_density_grid_edges(self):
+		return self.density_grid_edges
+
+
+	def set_randoms_grid(self, rg):
+		self.randoms_grid = rg
+
+
+	def get_randoms_grid(self):
+		return self.randoms_grid
+
+
+	def set_kernel(self, k):
+		self.kernel = k
+
+
+	def get_kernel(self):
+		return self.kernel
+
+
+	def set_centers_grid(self, cg):
+		self.centers_grid = cg
+
+
+	def get_centers_grid(self):
+		return self.centers_grid
+
+
+	def set_background_grid(self, bg):
+		self.background_grid = bg
+
+
+	def get_background_grid(self):
+		return self.background_grid
 
 
 	def make_histo_grid(self):
@@ -422,46 +475,6 @@ class CenterFinder:
 		del self.centers_grid
 		del self.background_grid
 		del self.kernel_radius
-
-
-	def set_density_grid(self, dg):
-		self.density_grid = dg
-
-
-	def get_density_grid(self):
-		return self.density_grid
-
-
-	def set_density_grid_edges(self, dge):
-		self.density_grid_edges = dge
-
-
-	def get_density_grid_edges(self):
-		return self.density_grid_edges
-
-
-	def set_randoms_grid(self, rg):
-		self.randoms_grid = rg
-
-
-	def get_randoms_grid(self):
-		return self.randoms_grid
-
-
-	def set_centers_grid(self, cg):
-		self.centers_grid = cg
-
-
-	def get_centers_grid(self):
-		return self.centers_grid
-
-
-	def set_background_grid(self, bg):
-		self.background_grid = bg
-
-
-	def get_background_grid(self):
-		return self.background_grid
 
 
 	def make_grids(self, 

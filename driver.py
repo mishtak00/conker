@@ -33,7 +33,7 @@ def main():
 
 	# preps output folder
 	filename1 = remove_ext(args.file1)
-	savename = 'out_conker_f1_{}'.format(filename1)
+	savename = 'out_f1_{}'.format(filename1)
 
 	if args.file0:
 		filename0 = remove_ext(args.file0)
@@ -43,6 +43,9 @@ def main():
 	if args.randoms_file:
 		filenameR = remove_ext(args.randoms_file)
 		savename += '_fR_{}'.format(filenameR)
+	elif args.randoms_grid:
+		filenameR = remove_ext(args.randoms_grid)
+		savename += '_gR_{}'.format(filenameR)
 	else:
 		filenameR = filename1
 
@@ -56,7 +59,7 @@ def main():
 	corr = Correlator(args.order, args.file1, file0=args.file0,
 		fileR=args.randoms_file, file_gridR=args.randoms_grid,
 		params_file=args.params_file, printout=args.verbose,
-		save=args.save, savename=savename)
+		save=args.save, save_randoms=args.save_randoms, savename=savename)
 
 	# creates and puts cf object instance for randoms (non-conv background)
 	fileR = args.file1 if not args.randoms_file else args.randoms_file

@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses.
 
 from math import pi, exp
 import numpy as np
+import sys
 
 
 
@@ -51,7 +52,7 @@ class Kernel:
 		if self.printout:
 			print(f'Constructing {self.type} kernel...')
 
-		self.grid, self.kernel_r_idx_units_upper_bound = self._make_grid()
+		self.grid, self.kernel_r_idx_units = self._make_grid()
 
 		if self.printout:
 			print('Kernel constructed successfully...')
@@ -80,8 +81,8 @@ class Kernel:
 		# calculates the kernel inscribed radius in index units.
 		# for a kernel with radius 100 and grid_spacing 10, the radius
 		# is 10 in idx unitx. this puts the value of the function at
-		# r = 100 in the 11th bin of the 1D function.
-		kernel_r_idx_units = int(np.ceil(self.radius / self.grid_spacing))
+		# r = 100 in bin idx 10 (the 11th bin) of the 1D function.
+		kernel_r_idx_units = int(self.radius // self.grid_spacing) + 1
 		# calculates circumscribed sphere radius for easy eval of 1D func
 		circumscribed_r_idx_units = int(np.ceil(3**.5 * kernel_r_idx_units))
 		# calculates the number of bins in each dimensional axis
@@ -89,7 +90,7 @@ class Kernel:
 		# the kernel construction has a distinct central bin on any given run
 		kernel_bin_count = 2 * kernel_r_idx_units + 1
 		# central bin index, since the kernel is a cube this can just be one int
-		kernel_center_idx = int(kernel_bin_count / 2)
+		kernel_center_idx = kernel_bin_count // 2
 		kernel_center = np.array([kernel_center_idx, ] * 3)
 
 		return (
@@ -103,7 +104,7 @@ class Kernel:
 		kernel_r_idx_units = len(func_arr)
 		circumscribed_r_idx_units = int(np.ceil(3**.5 * kernel_r_idx_units))
 		kernel_bin_count = 2 * kernel_r_idx_units + 1
-		kernel_center_idx = int(kernel_bin_count / 2)
+		kernel_center_idx = kernel_bin_count // 2
 		kernel_center = np.array([kernel_center_idx, ] * 3)
 		return (
 			kernel_r_idx_units, circumscribed_r_idx_units,
@@ -114,8 +115,10 @@ class Kernel:
 	def _make_step(self, kernel_r_idx_units: int, circumscribed_r_idx_units: int):
 		# transforms kernel thickness to index units
 		thickness_idx_units = int(np.ceil(self.thickness / self.grid_spacing))
-		kernel_r_idx_units_upper_bound = kernel_r_idx_units + 0.5 * thickness_idx_units
-		kernel_r_idx_units_lower_bound = kernel_r_idx_units - 0.5 * thickness_idx_units
+		# note these have to be lowered by 1 for correct calculation of bounds 
+		# kernel_r_idx_units = 2 needs upper idx bound 1.5 (idx 1 is 2nd idx)
+		kernel_r_idx_units_upper_bound = kernel_r_idx_units + 0.5 * thickness_idx_units - 1
+		kernel_r_idx_units_lower_bound = kernel_r_idx_units - 0.5 * thickness_idx_units - 1
 
 		step_func = np.array([
 			1 if i>=kernel_r_idx_units_lower_bound 
@@ -134,8 +137,8 @@ class Kernel:
 		# transforms stdev to index units
 		stdev_idx_units = int(np.ceil(self.stdev / self.grid_spacing))
 		# 99.7% of all data in a normal dist is within 3 std devs of mean
-		kernel_r_idx_units_upper_bound = kernel_r_idx_units + 3*stdev_idx_units
-		kernel_r_idx_units_lower_bound = kernel_r_idx_units - 3*stdev_idx_units
+		kernel_r_idx_units_upper_bound = kernel_r_idx_units + 3*stdev_idx_units - 1
+		kernel_r_idx_units_lower_bound = kernel_r_idx_units - 3*stdev_idx_units - 1
 
 		# calculates 1/(stdev root(2pi)) e^(- (x-mean)^2 / (2 stdev^2))
 		over_sroot2pi = 1. / (stdev_idx_units * (2.*pi)**.5)
@@ -157,8 +160,8 @@ class Kernel:
 	def _make_wavelet(self, kernel_r_idx_units: int, circumscribed_r_idx_units: int):
 		# transforms wavelet width parameter to index units
 		width_idx_units = int(np.ceil(self.width / self.grid_spacing))
-		kernel_r_idx_units_upper_bound = kernel_r_idx_units + 2*width_idx_units
-		kernel_r_idx_units_lower_bound = kernel_r_idx_units - 2*width_idx_units
+		kernel_r_idx_units_upper_bound = kernel_r_idx_units + 2*width_idx_units - 1
+		kernel_r_idx_units_lower_bound = kernel_r_idx_units - 2*width_idx_units - 1
 
 		# calculates psi(x) = 1/(4 pi x^2) ( 2 B_3(2(x-R)/s) - B_3((x-R)/s) )
 		# where B_3(x) = 1/12 (|x-2|^3 - 4|x-1|^3 + 6|x|^3 - 4|x+1|^3 + |x+2|^3)
@@ -202,7 +205,6 @@ class Kernel:
 		if self.type=='step' or self.type=='gaussian' or self.type=='wavelet':
 			kernel_r_idx_units, circumscribed_r_idx_units,\
 			kernel_bin_count, kernel_center_idx, kernel_center = self._calculate_settings()
-			
 
 		# evaluates 1D function that's gonna be rotated below
 		# defined over the entire radius of the circumscribed sphere of the kernel cube
@@ -225,9 +227,9 @@ class Kernel:
 				for i in range(circumscribed_r_idx_units)])
 		elif self.type=='ball':
 			# forms a filled-sphere kernel
-			kernel_r_idx_units = int(np.ceil(self.radius / self.grid_spacing))
+			kernel_r_idx_units = int(self.radius // self.grid_spacing) + 1
 			func = np.ones(kernel_r_idx_units)
-			func /= len(func)
+			func /= len(func) # norm
 			kernel_r_idx_units_lower_bound = 0
 			kernel_r_idx_units_upper_bound = len(func)
 			_, circumscribed_r_idx_units,\
@@ -235,7 +237,7 @@ class Kernel:
 			# pads function with 0s from the user-fed radius to the circurmscribed radius
 			func = np.array([func[i] if i<kernel_r_idx_units else 0 
 				for i in range(circumscribed_r_idx_units)])
-
+		# print(func)
 		if self.printout:
 			print('Kernel radius in index units:', kernel_r_idx_units)
 			print('Kernel radius upper bound:', kernel_r_idx_units_upper_bound)
@@ -246,17 +248,25 @@ class Kernel:
 		if self.plot:
 			self._plot_1d_func(func, circumscribed_r_idx_units)
 
-		return Kernel._sphericize(func, kernel_center, kernel_bin_count), kernel_r_idx_units_upper_bound
+		return (
+			Kernel._sphericize(func, 
+				kernel_center, kernel_bin_count, 
+				kernel_r_idx_units_upper_bound), 
+			kernel_r_idx_units
+			)
 
 
 
 	@staticmethod
-	def _sphericize(func: np.array, center: np.array, bin_count: int):
-		return np.array([[[
-			func[int(np.linalg.norm(np.array([i,j,k])-center))]
-			for k in range(bin_count)]
-			for j in range(bin_count)]
-			for i in range(bin_count)])
+	def _sphericize(func: np.array, center: np.array, bin_count: int, radius: int):
+		kern = np.zeros((bin_count,)*3)
+		for i in range(bin_count):
+			for j in range(bin_count):
+				for k in range(bin_count):
+					idx_dist = int(np.ceil(np.linalg.norm(np.array([i,j,k])-center)))
+					if idx_dist < radius:
+						kern[i,j,k] = func[idx_dist]
+		return kern
 
 
 

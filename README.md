@@ -8,7 +8,8 @@ python driver.py --help
 ```
 
 ### Rules on input and randoms catalogs
-There are 3 arguments for specifying the input catalogs:
+There are 4 arguments for specifying the inputs. All inputs have to be in the 'data' folder.
+
 - Positional (obligatory) argument for input catalog 1
 ```
 python driver.py filename1.fits
@@ -18,8 +19,13 @@ python driver.py filename1.fits
 -f0 filename0.fits OR --file0 filename0.fits
 ```
 - Optional argument for randoms catalog. Defining this argument requests that the randoms grid (pre-convolution background) be calculated from histogramming and factorizing this randoms catalog. Omitting this will cause ConKer to calculate the background grid from input catalog 1.
+- It's a good idea to save the randoms grid for a certain catalog at a specific grid spacing so that it's only calculated once. Saved in the output folder and has to be manually put in the 'data' folder if it's to be used as input for future correlations.
 ```
---randoms_file filenameR.fits
+--randoms_file filenameR.fits --save_randoms
+```
+Optional argument for specifying a pre-made randoms grid. Putting this argument requests that the randoms grid be loaded from the 'data' folder and used as is. This randoms grid has to have been made from the same catalog as the input catalog and its grid spacing must be the same as the one in the parameters file for current run. Undefined behavior if otherwise.
+```
+--randoms_grid filename_gridR_gs_5.npy
 ```
 
 ### Rules on boundaries

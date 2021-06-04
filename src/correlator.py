@@ -33,6 +33,7 @@ class Correlator:
 		file_gridR: str = None,
 		params_file: str = 'params.json',
 		save: bool = False,
+		save_randoms = False,
 		savename: str = None,
 		printout: bool = False
 		):
@@ -53,11 +54,9 @@ class Correlator:
 			self.type = 'cross'
 			self.file0 = file0
 		# makes background from randoms catalog
-		if fileR:
-			self.fileR = fileR
+		self.fileR = fileR
 		# loads randoms grid from file
-		if file_gridR:
-			self.file_gridR = file_gridR
+		self.file_gridR = file_gridR
 
 		
 		# # correlation order has to match radii given
@@ -67,6 +66,7 @@ class Correlator:
 
 		self.params_file = params_file
 		self.save = save
+		self.save_randoms = save_randoms
 		self.savename = savename
 		self.printout = printout
 
@@ -111,16 +111,22 @@ class Correlator:
 
 
 	def make_cfR(self, dge):
-		# cfR only needs to build the randoms grid
-		self.cfR.set_density_grid_edges(dge) # from cf0
-		self.NR = self.cfR.make_histo_grid()
-		self.cfR.make_randoms_grid()
-
-		# normalizes the randoms grid
-		# sets randoms grid for use with cf0 and cf1
-		data2rand_ratio = self.ND / self.NR
-		self.randoms_grid = self.cfR.get_randoms_grid()\
-							* data2rand_ratio
+		if self.file_gridR:
+			self.cfR.set_randoms_grid(np.load('data/'+self.file_gridR))
+			self.randoms_grid = self.cfR.get_randoms_grid()
+		else:
+			# cfR only needs to build the randoms grid
+			self.cfR.set_density_grid_edges(dge) # from cf0
+			self.NR = self.cfR.make_histo_grid()
+			self.cfR.make_randoms_grid()
+			# normalizes the randoms grid
+			# sets randoms grid for use with cf0 and cf1
+			data2rand_ratio = self.ND / self.NR
+			self.randoms_grid = self.cfR.get_randoms_grid()\
+								* data2rand_ratio
+			if self.save_randoms:
+				np.save(self.savename + 'randoms_grid_gs_{}.npy'\
+					.format(self.cf0.grid_spacing), self.randoms_grid)
 
 
 	def _customize_cf0(self, args):
@@ -290,19 +296,21 @@ class Correlator:
 			.format(self.order, separation[0], separation[-1]), correlation)
 		import matplotlib.pyplot as plt
 		plt.plot(separation, correlation)
-		plt.savefig(self.savename + '{}pcf_conker_scan_{}_{}.png'\
+		plt.savefig(self.savename + '{}pcf_scan_{}_{}.png'\
 			.format(self.order, separation[0], separation[-1]))
 
 
 	def scan_correlate(self, scan_args):
 		start, end = scan_args
-		self.corrfunc = {s: None for s in \
-			np.arange(start, end, self.cf1.grid_spacing)}
+		step = self.cf1.grid_spacing
+		correction = 0.5 * step
+		steps = np.arange(start, end+step, step)
+		self.corrfunc = {}
 
-		for s in self.corrfunc.keys():
+		for s in steps:
 			self.cf1.set_kernel_radius(s)
 			W, B = self._correlate()
-			self.corrfunc[s] = W / B
+			self.corrfunc[s - correction] = W / B
 
 		self.save_scan()
 
