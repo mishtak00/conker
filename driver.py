@@ -57,9 +57,11 @@ def main():
 
 	# sets up correlator object for run
 	corr = Correlator(args.order, args.file1, file0=args.file0,
-		fileR=args.randoms_file, file_gridR=args.randoms_grid,
-		params_file=args.params_file, printout=args.verbose,
-		save=args.save, save_randoms=args.save_randoms, savename=savename)
+		fileR=args.randoms_file, file_gridR=args.randoms_grid, 
+		save_randoms=args.save_randoms,
+		params_file=args.params_file, 
+		printout=args.verbose,
+		save=args.save, savename=savename)
 
 	# creates and puts cf object instance for randoms (non-conv background)
 	fileR = args.file1 if not args.randoms_file else args.randoms_file
