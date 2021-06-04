@@ -28,6 +28,9 @@ Optional argument for specifying a pre-made randoms grid. Putting this argument 
 --randoms_grid filename_gridR_gs_5.npy
 ```
 
+### Outputs
+The requested correlation and its related separation distance will be saved in .npy format in a folder named 'out_f1_FILENAME1_...'. If it's a scan of an isotropic correlation, a plot will be saved in the 'plots' folder.
+
 ### Rules on boundaries
 - All boundaries will be decided from input catalog 0, i.e. they will override the boundaries from randoms catalog and input catalog 1.
 - In the case of a separate randoms catalog, only those randoms within file 0 boundaries will be considered in the grid making processes.
