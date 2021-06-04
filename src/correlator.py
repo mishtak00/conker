@@ -17,7 +17,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses.
 
 import sys
 import numpy as np
+import matplotlib.pyplot as plt
 from .centerfinder import CenterFinder
+from .utils import remove_ext
 
 
 
@@ -31,6 +33,7 @@ class Correlator:
 		file0: str = None,
 		fileR: str = None,
 		file_gridR: str = None,
+		noniso: bool = False,
 		params_file: str = 'params.json',
 		save: bool = False,
 		save_randoms = False,
@@ -58,10 +61,12 @@ class Correlator:
 		# loads randoms grid from file
 		self.file_gridR = file_gridR
 
-		
+		self.type_spatial = 'iso'
+		if noniso:
+			self.type_spatial = 'noniso'
+
 		# # correlation order has to match radii given
 		# assert order == len(r1_list) + 1
-		# self.r0 = r0
 		# self.r1_list = r1_list
 
 		self.params_file = params_file
@@ -125,8 +130,9 @@ class Correlator:
 			self.randoms_grid = self.cfR.get_randoms_grid()\
 								* data2rand_ratio
 			if self.save_randoms:
-				np.save(self.savename + 'randoms_grid_gs_{}.npy'\
-					.format(self.cf0.grid_spacing), self.randoms_grid)
+				np.save(self.savename + 'randoms_grid_gs_{}_fR_{}.npy'\
+					.format(self.cf0.grid_spacing, remove_ext(self.fileR)), 
+					self.randoms_grid)
 
 
 	def _customize_cf0(self, args):
@@ -246,10 +252,14 @@ class Correlator:
 
 	def _correlate(self):
 		self.cf1.make_convolved_grids()
-		self.W1_prod, self.B1_prod = Correlator\
-			._reduce_mult_till_order(self.cf1, self.order)
-		W = self.W0 * self.W1_prod
-		B = self.B0 * self.B1_prod
+		# self.W1_prod, self.B1_prod = Correlator\
+		# 	._reduce_mult_till_order(self.cf1, self.order)
+		# W = self.W0 * self.W1_prod
+		# B = self.B0 * self.B1_prod
+		W1 = self.cf1.get_centers_grid()
+		B1 = self.cf1.get_background_grid()
+		W = self.W0 * W1 ** (self.order - 1)
+		B = self.B0 * B1 ** (self.order - 1)
 		if self.save:
 			r1, r0 = self.cf1.kernel_radius, self.cf0.kernel_radius
 			np.save(self.savename + '{}pcf_W_r1_{}_r0_{}.npy'\
@@ -284,7 +294,7 @@ class Correlator:
 		self.save_single()
 
 
-	def save_scan(self):
+	def _save_scan(self):
 		separation = list(self.corrfunc.keys())
 		correlation = list(self.corrfunc.values())
 		if self.printout:
@@ -294,10 +304,37 @@ class Correlator:
 			.format(self.order, separation[0], separation[-1]), separation)
 		np.save(self.savename + '{}pcf_corr_range_{}_{}.npy'\
 			.format(self.order, separation[0], separation[-1]), correlation)
-		import matplotlib.pyplot as plt
-		plt.plot(separation, correlation)
-		plt.savefig(self.savename + '{}pcf_scan_{}_{}.png'\
-			.format(self.order, separation[0], separation[-1]))
+
+
+	def _save_plot(self):
+		separation = list(self.corrfunc.keys())
+		correlation = list(self.corrfunc.values())
+		plt.plot(separation, correlation, 
+			label='conker r0={} gs={}'\
+			.format(self.cf0.kernel_radius, self.cf0.grid_spacing))
+
+		plt.title('ConKer: {} {} {}pcf'\
+			.format(
+				remove_ext(self.file1), 
+				'weighted' if self.cf1.weighted else 'unweighted',
+				self.order
+				)
+			)
+		plt.xlabel(r'$s$ $[h^{-1}Mpc]$')
+		plt.ylabel(r'$\xi(s)$')
+		plt.grid(linestyle=':')
+		plt.legend()
+
+		plt.savefig('plots/' + \
+			'{}pcf_scan_{}_{}_{}.png'\
+			.format(
+				self.order, 
+				separation[0], 
+				separation[-1],
+				remove_ext(self.file1)
+				), 
+			dpi=300
+			)
 
 
 	def scan_correlate(self, scan_args):
@@ -312,7 +349,9 @@ class Correlator:
 			W, B = self._correlate()
 			self.corrfunc[s - correction] = W / B
 
-		self.save_scan()
+		self._save_scan()
+		if self.type_spatial == 'iso':
+			self._save_plot()
 
 
 

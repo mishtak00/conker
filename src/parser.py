@@ -22,6 +22,7 @@ from argparse import ArgumentParser
 class Parser(ArgumentParser):
 
 	def __init__(self):
+
 		super().__init__(description=
 			'~~~~~~~~~~~~~~~~~ ( X ) ConKer ( X ) ~~~~~~~~~~~~~~~~~')
 
@@ -31,10 +32,6 @@ class Parser(ArgumentParser):
 		self.add_argument('-f0', '--file0', type=str, default=None,
 			help='Name of .fits file with other input catalog '\
 			'for cross-correlation. Auto-correlation if ommitted. ')
-		self.add_argument('--randoms_file', type=str, default=None,
-			help='Name of .fits file with randoms catalog for background.')
-		self.add_argument('--randoms_grid', type=str, default=None,
-			help='Name of .npy file containing premade randoms backround grid.')
 		self.add_argument('-n', '--order', type=int, default=2,
 			help='Correlation order wanted. Has to be >= 2.')
 		self.add_argument('-p', '--params_file', type=str, default='params.json', 
@@ -50,8 +47,15 @@ class Parser(ArgumentParser):
 		self.add_argument('--scan', nargs=2, type=float,
 			help='Calculates correlation function from 1st arg (iclusive) '
 					'to 2nd arg (exclusive) by step of grid_spacing.')
+		# self.add_argument('-l', '--plot', action='store_true',
+		# 	help='A plot of the result (iso, scan only) will be saved to output.')
 
 		# these define behavior of randoms cf
+		randoms = self.add_mutually_exclusive_group()
+		randoms.add_argument('-fR', '--randoms_file', type=str, default=None,
+			help='Name of .fits file with randoms catalog for background.')
+		randoms.add_argument('-gR', '--randoms_grid', type=str, default=None,
+			help='Name of .npy file containing premade randoms backround grid.')
 		self.add_argument('-wR', '--wtd_randoms', action='store_true',
 			help='Randoms catalog will be interpreted as having weights on 4th col.')
 		
