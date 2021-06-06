@@ -30,23 +30,26 @@ class Parser(ArgumentParser):
 		self.add_argument('file1', metavar='INPUT_FILE_1', type=str, 
 			help='Name of .fits file with the input catalog.')
 		self.add_argument('-f0', '--file0', type=str, default=None,
-			help='Name of .fits file with other input catalog '\
+			help='Name of .fits file with other input catalog '
 			'for cross-correlation. Auto-correlation if ommitted. ')
 		self.add_argument('-n', '--order', type=int, default=2,
 			help='Correlation order wanted. Has to be >= 2.')
-		self.add_argument('-p', '--params_file', type=str, default='params.json', 
-			help='Sets custom hyperparameters file.')
+		# self.add_argument('--noniso', action='store_true',
+		# 	help='Requests a non-isotropic correlation (all separation combos). '
+		# 	'Omitting this requests an isotropic correlation (main diagonal).')
+		self.add_argument('--scan', nargs=2, type=float,
+			help='Calculates correlation function from 1st arg (iclusive) '
+			'to 2nd arg (exclusive) by step of grid_spacing.')
 
 		# ancillary behaviors
+		self.add_argument('-p', '--params_file', type=str, default='params.json', 
+			help='Sets custom hyperparameters file.')
 		self.add_argument('-s', '--save', action='store_true', 
 			help='Grids and .fits output will be automatically saved to an \'out\' folder.')
 		self.add_argument('-sR', '--save_randoms', action='store_true',
 			help='Randoms background grid will be saved to output folder.')
 		self.add_argument('-v', '--verbose', action='store_true', 
 			help='The progress of CenterFinder will be printed out to standard output.')
-		self.add_argument('--scan', nargs=2, type=float,
-			help='Calculates correlation function from 1st arg (iclusive) '
-					'to 2nd arg (exclusive) by step of grid_spacing.')
 		# self.add_argument('-l', '--plot', action='store_true',
 		# 	help='A plot of the result (iso, scan only) will be saved to output.')
 

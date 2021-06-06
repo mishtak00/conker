@@ -2,6 +2,8 @@
 
 *** DEV ***
 
+CURRENTLY SUPPORTS ONLY ISOTROPIC CORRELATIONS (OF ANY ORDER)
+
 Get all available cmd line arguments with explanations:
 ```
 python driver.py --help
@@ -44,12 +46,12 @@ Run a second-order auto-correlation on filename1 using randoms from filenameR, d
 python driver.py filename1.fits --randoms_file filenameR.fits
 ```
 
-Run 2pcf scan at K0 radius = 10 Mpch-1 and K1 radius from 70 (incusive) to 140 (exclusive) Mpch-1 in steps of grid_spacing, with progress logs on std out (-v), and saves all intermediate grids to output folders:
+Run iso 2pcf scan at K0 radius = 10 Mpch-1 and K1 radius from 70 (incusive) to 140 (exclusive) Mpch-1 in steps of grid_spacing, with progress logs on std out (-v), and saves all intermediate grids to output folders:
 ```
 python driver.py filename1.fits --randoms_file filenameR.fits -r0 10 --scan 70 140 -v -s
 ```
 
-Run 3pcf scan at K0 radius = 10 Mpch-1 and K1 radius from 70 (incusive) to 140 (exclusive) Mpch-1 in steps of grid_spacing, saves just the resulting correlation and separation arrays in the output folder:
+Run iso 3pcf scan at K0 radius = 10 Mpch-1 and K1 radius from 70 (incusive) to 140 (exclusive) Mpch-1 in steps of grid_spacing, saves just the resulting correlation and separation arrays in the output folder:
 ```
 python driver.py filename1.fits --randoms_file filenameR.fits -v -r0 10 --scan 70 140 -n 3
 ```

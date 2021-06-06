@@ -235,7 +235,7 @@ class Correlator:
 	@staticmethod
 	def _reduce_mult_till_order(cf1: CenterFinder, order: int) \
 		-> (np.ndarray, np.ndarray):
-		"""
+		"""DEPRECATED METHOD
 		Reduction that maps high order corrfunc over same object.
 		Note this acts like a reduction but the args list is
 		created dynamically, i.e. W1, W1-1, W1-2 ... W1-(n-2)
@@ -252,10 +252,6 @@ class Correlator:
 
 	def _correlate(self):
 		self.cf1.make_convolved_grids()
-		# self.W1_prod, self.B1_prod = Correlator\
-		# 	._reduce_mult_till_order(self.cf1, self.order)
-		# W = self.W0 * self.W1_prod
-		# B = self.B0 * self.B1_prod
 		W1 = self.cf1.get_centers_grid()
 		B1 = self.cf1.get_background_grid()
 		W = self.W0 * W1 ** (self.order - 1)
