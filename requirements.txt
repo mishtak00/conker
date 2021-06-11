@@ -1,3 +1,4 @@
 astropy>=4.0.1.post1
 numpy>=1.18.4
 scipy>=1.4.1
+progress>=1.5

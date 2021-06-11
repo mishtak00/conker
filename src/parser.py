@@ -34,9 +34,9 @@ class Parser(ArgumentParser):
 			'for cross-correlation. Auto-correlation if ommitted. ')
 		self.add_argument('-n', '--order', type=int, default=2,
 			help='Correlation order wanted. Has to be >= 2.')
-		# self.add_argument('--noniso', action='store_true',
-		# 	help='Requests a non-isotropic correlation (all separation combos). '
-		# 	'Omitting this requests an isotropic correlation (main diagonal).')
+		self.add_argument('--noniso', action='store_true',
+			help='Requests a non-isotropic correlation (all separation combos). '
+			'Omitting this requests an isotropic correlation (main diagonal).')
 		self.add_argument('--scan', nargs=2, type=float,
 			help='Calculates correlation function from 1st arg (iclusive) '
 			'to 2nd arg (exclusive) by step of grid_spacing.')

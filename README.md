@@ -9,6 +9,11 @@ Get all available cmd line arguments with explanations:
 python driver.py --help
 ```
 
+### Calibration
+```
+python calibrate.py random0_DR12v5_CMASS_South.fits
+```
+
 ### Rules on input and randoms catalogs
 There are 4 arguments for specifying the inputs. All inputs have to be in the 'data' folder.
 

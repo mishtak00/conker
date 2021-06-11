@@ -106,7 +106,8 @@ def interpolate_r_z(redshift_min: float, redshift_max: float, cosmology: tuple):
 	return LUT_radii, LUT_redshifts
 
 
-def sky2cartesian(ra: np.array, dec: np.array, redshift: np.array, LUT_radii) -> (np.array, np.array, np.array):
+def sky2cartesian(ra: np.array, dec: np.array, redshift: np.array, LUT_radii) \
+	-> (np.array, np.array, np.array):
 	# note that polar angle = pi/2 - declination
 	# sin(polar) = cos(90-polar) = cos(dec)
 	# cos(polar) = sin(90-polar) = sin(dec)

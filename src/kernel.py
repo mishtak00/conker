@@ -76,6 +76,9 @@ class Kernel:
 		return self.grid
 
 
+	def get_kernel_center(self):
+		return self.kernel_center
+
 
 	def _calculate_settings(self):
 		# calculates the kernel inscribed radius in index units.
@@ -91,11 +94,11 @@ class Kernel:
 		kernel_bin_count = 2 * kernel_r_idx_units + 1
 		# central bin index, since the kernel is a cube this can just be one int
 		kernel_center_idx = kernel_bin_count // 2
-		kernel_center = np.array([kernel_center_idx, ] * 3)
+		self.kernel_center = np.array([kernel_center_idx, ] * 3)
 
 		return (
 			kernel_r_idx_units, circumscribed_r_idx_units,
-			kernel_bin_count, kernel_center_idx, kernel_center)
+			kernel_bin_count, kernel_center_idx, self.kernel_center)
 
 
 
@@ -105,10 +108,10 @@ class Kernel:
 		circumscribed_r_idx_units = int(np.ceil(3**.5 * kernel_r_idx_units))
 		kernel_bin_count = 2 * kernel_r_idx_units + 1
 		kernel_center_idx = kernel_bin_count // 2
-		kernel_center = np.array([kernel_center_idx, ] * 3)
+		self.kernel_center = np.array([kernel_center_idx, ] * 3)
 		return (
 			kernel_r_idx_units, circumscribed_r_idx_units,
-			kernel_bin_count, kernel_center_idx, kernel_center)
+			kernel_bin_count, kernel_center_idx, self.kernel_center)
 
 
 
