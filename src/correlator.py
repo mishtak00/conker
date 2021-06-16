@@ -65,6 +65,12 @@ class Correlator:
 		if noniso:
 			self.type_spatial = 'noniso'
 
+		# default calibration reference
+		# this just serves as a default
+		# and may be overridden in load_calib()
+		self.calibfile = 'calib_ref_random0_DR12v5_CMASS_South_gs_5.npy'
+		self.calib: float = None
+
 		# # correlation order has to match radii given
 		# assert order == len(r1_list) + 1
 		# self.r1_list = r1_list
@@ -130,8 +136,8 @@ class Correlator:
 			self.randoms_grid = self.cfR.get_randoms_grid()\
 								* data2rand_ratio
 			if self.save_randoms:
-				np.save(self.savename + 'randoms_grid_gs_{}_fR_{}.npy'\
-					.format(self.cf0.grid_spacing, remove_ext(self.fileR)), 
+				np.save(self.savename + 'gridR_{}_gs_{}.npy'\
+					.format(remove_ext(self.fileR), self.cf0.grid_spacing), 
 					self.randoms_grid)
 
 
@@ -286,23 +292,25 @@ class Correlator:
 		s = self.cf1.kernel_radius
 		self.corrfunc = {s: None}
 		W, B = self._correlate()
-		self.corrfunc[s] = W / B
+		self.corrfunc[s - self.calib] = W / B
 		self.save_single()
 
 
-	def _save_scan(self):
+	def _save_scan(self, scan_args):
+		losep, hisep = scan_args
 		separation = list(self.corrfunc.keys())
 		correlation = list(self.corrfunc.values())
 		if self.printout:
 			print('Separation array:\n', separation)
 			print('Correlation array:\n', correlation)
 		np.save(self.savename + '{}pcf_sep_range_{}_{}.npy'\
-			.format(self.order, separation[0], separation[-1]), separation)
+			.format(self.order, losep, hisep), separation)
 		np.save(self.savename + '{}pcf_corr_range_{}_{}.npy'\
-			.format(self.order, separation[0], separation[-1]), correlation)
+			.format(self.order, losep, hisep), correlation)
 
 
-	def _save_plot(self):
+	def _save_plot(self, scan_args):
+		losep, hisep = scan_args
 		separation = list(self.corrfunc.keys())
 		correlation = list(self.corrfunc.values())
 		plt.plot(separation, correlation, 
@@ -336,7 +344,6 @@ class Correlator:
 	def scan_correlate(self, scan_args):
 		start, end = scan_args
 		step = self.cf1.grid_spacing
-		correction = 0.5 * step
 		steps = np.arange(start, end+step, step)
 		self.corrfunc = {}
 
@@ -344,14 +351,37 @@ class Correlator:
 			self.cf1.set_kernel_radius(s)
 			W, B = self._correlate()
 			# TODO: save W,B at each step
-			self.corrfunc[s - correction] = W / B
+			self.corrfunc[s - self.calib] = W / B
 
-		self._save_scan()
+		self._save_scan(scan_args)
 		if self.type_spatial == 'iso':
-			self._save_plot()
+			self._save_plot(scan_args)
 
 
+	def load_calib(self):
+		if self.printout:
+			print('Loading calibration data...')
 
+		try:
+			if self.fileR:
+				calibfile = 'calibration/' + 'calib_ref_{}_gs_{}.npy'\
+					.format(remove_ext(self.fileR), self.cf1.grid_spacing)
+			elif self.file_gridR:
+				# reconstructs expected calib filename from gridR filename
+				# changes expected file_gridR model: 'gridR_random0_DR12v5_CMASS_South_gs_5.npy'
+				# to make: 'calib_ref_random0_DR12v5_CMASS_South_gs_5.npy'
+				fname = '_'.join(self.file_gridR.split('_')[1:])
+				calibfile = 'calibration/calib_ref_' + fname				
+
+			self.calib = np.load(calibfile)
+			self.calibfile = calibfile # success
+			if self.printout:
+				print('Loaded CUSTOM calibration data from file:\n', self.calibfile)	
+
+		except:
+			self.calib = np.load(self.calibfile)
+			if self.printout:
+				print('Loaded DEFAULT calibration data from file:\n', self.calibfile)
 
 
 

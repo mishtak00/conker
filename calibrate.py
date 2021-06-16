@@ -194,15 +194,18 @@ def main():
 		print('Calculating mean for calibration...')
 		actual_ds = np.array(actual_ds)
 		mean = np.mean(actual_ds)
-		rvsr[r] = (mean,min(actual_ds),max(actual_ds))
+		meanerrs = actual_ds - mean
+		lomeanerrs = meanerrs[meanerrs < 0]
+		himeanerrs = meanerrs[meanerrs >= 0]
+		loerr = sqrt(np.mean(lomeanerrs**2))
+		hierr = sqrt(np.mean(himeanerrs**2))
+		# rvsr[r] = (mean,min(actual_ds),max(actual_ds))
+		rvsr[r] = (mean, loerr, hierr)
 
 		print('Mean actual distance:', mean)
 		mean = np.array(mean)
 		filename = remove_ext(input_file)
-		np.save('{}calib_{}_gs_{}_r1_{}.npy'\
-			.format(outdir, filename, grid_spacing, r), 
-			mean)
-		np.save('{}calib_arr_{}_gs_{}_r1_{}.npy'\
+		np.save('{}calib_mean_{}_gs_{}_r1_{}.npy'\
 			.format(outdir, filename, grid_spacing, r), 
 			mean)
 
@@ -223,15 +226,16 @@ def main():
 	rs = np.array(list(rvsr.keys()))
 	vals = np.array(list(rvsr.values()))
 	means = vals[:,0]
-	loerrs = abs(vals[:,1] - means)
-	uperrs = abs(vals[:,2] - means)
-	meanerrs = np.mean(rs - means)
+	loerrs = vals[:,1]
+	uperrs = vals[:,2]
+	meanerr = np.round(np.mean(rs - means), 
+		decimals=rounding_precision)
 	np.save('{}calib_ref_{}_gs_{}.npy'\
 			.format(outdir, filename, grid_spacing), 
-			meanerrs)
+			meanerr)
 
 	plt.errorbar(rs, means, yerr=[loerrs,uperrs], label='uncalibrated', c='orange')
-	plt.errorbar(rs, means+meanerrs, label='calibrated', c='cornflowerblue')
+	plt.errorbar(rs, means+meanerr, label='calibrated', c='cornflowerblue')
 	plt.title('ConKer: Actual distances vs. discrete distances')
 	plt.xlabel(r'$r_{discrete}$ $[h^{-1}Mpc]$')
 	plt.ylabel(r'$r_{actual}$ $[h^{-1}Mpc]$')
@@ -245,7 +249,8 @@ def main():
 		dpi=300)
 	plt.close()
 
-	print('Mean error in separation between 2 points:', meanerrs)
+	print('Mean separation error to {} decimal places:'\
+		.format(rounding_precision), meanerr)
 	print('Calibration ended successfully...')
 
 

@@ -16,9 +16,14 @@ pip install -r requirements.txt
 ```
 
 ### Calibration
+For best binning results, please always run a calibration for any particular combination of randoms file, grid spacing and correlation scanning range: 
 ```
 python calibrate.py random0_DR12v5_CMASS_South.fits --scan 60 140
 ```
+
+Note that a Correlator will automatically search for and load the correct calibration file for the current run from the calibration folder. Changing calibration filenames manually will result in undefined behavior when a Correlator goes to read them.
+
+If Correlator cannot open an existing calibration file, then it will default to calibration file "calib_ref_random0_DR12v5_CMASS_South_gs_5.npy" that comes with this repo.
 
 ### Help
 Get all available cmd line arguments with explanations:
@@ -44,7 +49,7 @@ python driver.py filename1.fits
 ```
 Optional argument for specifying a pre-made randoms grid. Putting this argument requests that the randoms grid be loaded from the 'data' folder and used as is. This randoms grid has to have been made from the same catalog as the input catalog and its grid spacing must be the same as the one in the parameters file for current run. Undefined behavior if otherwise.
 ```
---randoms_grid filename_gridR_gs_5.npy
+--randoms_grid gridR_filenameR_gs_5.npy
 ```
 
 ### Outputs
@@ -63,18 +68,18 @@ Run a second-order auto-correlation on filename1 using randoms from filenameR, d
 python driver.py filename1.fits --randoms_file filenameR.fits
 ```
 
-Run iso 2pcf scan at K0 radius = 10 Mpch-1 and K1 radius from 70 (incusive) to 140 (exclusive) Mpch-1 in steps of grid_spacing, with progress logs on std out (-v), and saves all intermediate grids to output folders:
+Run isotropic 2pcf scan at K0 radius = 5 Mpch-1 and K1 radius from 60 (incusive) to 145 (exclusive) Mpch-1 in steps of grid_spacing, with progress logs on std out (-v), and saves all intermediate grids to output folders:
 ```
-python driver.py filename1.fits --randoms_file filenameR.fits -r0 10 --scan 70 140 -v -s
-```
-
-Run iso 3pcf scan at K0 radius = 10 Mpch-1 and K1 radius from 70 (incusive) to 140 (exclusive) Mpch-1 in steps of grid_spacing, saves just the resulting correlation and separation arrays in the output folder:
-```
-python driver.py filename1.fits --randoms_file filenameR.fits -v -r0 10 --scan 70 140 -n 3
+python driver.py filename1.fits --randoms_file filenameR.fits -r0 5 --scan 60 145 -v -s
 ```
 
-Run single 2pcf calculation at K1 radius = 110 and K0 radius = 10:
+Run isotropic 3pcf scan at K0 radius = 5 Mpch-1 and K1 radius from 60 (incusive) to 145 (exclusive) Mpch-1 in steps of grid_spacing, saves just the resulting correlation and separation arrays in the output folder:
 ```
-python driver.py mock_cmassDR9_north_3001.fits -v -r0 10 -r1 110
+python driver.py filename1.fits --randoms_file filenameR.fits -v -r0 5 --scan 60 145 -n 3
+```
+
+Run single 2pcf calculation at K1 radius = 110 and K0 radius = 5:
+```
+python driver.py mock_cmassDR9_north_3001.fits -v -r0 5 -r1 110
 ```
 

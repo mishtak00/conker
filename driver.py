@@ -91,6 +91,9 @@ def main():
 	# makes cf1 with randoms grid from cfR
 	corr.make_cf1(args)
 
+	# finds custom calib file or falls back to default
+	corr.load_calib()
+
 	# runs requested correlation and saves output
 	# scan command overrides single command
 	if args.scan:
