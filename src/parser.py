@@ -126,5 +126,21 @@ class Parser(ArgumentParser):
 
 
 
+class CalibrationParser(ArgumentParser):
+
+	def __init__(self):
+
+		super().__init__()
+		self.add_argument('fileR', metavar='RANDOMS_FILE', type=str,
+			help='Name of .fits catalog in \'data\' with randoms to be'\
+			'used in the calibration procedure.')
+		self.add_argument('--scan', nargs=2, type=float,
+			help='Calibrate over given separation range.'\
+			'1st arg inclusive, 2nd arg exclusive.')
+
+
+
+
+
 
 				

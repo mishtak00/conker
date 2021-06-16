@@ -343,6 +343,7 @@ class Correlator:
 		for s in steps:
 			self.cf1.set_kernel_radius(s)
 			W, B = self._correlate()
+			# TODO: save W,B at each step
 			self.corrfunc[s - correction] = W / B
 
 		self._save_scan()

@@ -4,14 +4,26 @@
 
 CURRENTLY SUPPORTS ONLY ISOTROPIC CORRELATIONS (OF ANY ORDER)
 
-Get all available cmd line arguments with explanations:
+### Setup
+Clone this repository to your local machine:
 ```
-python driver.py --help
+git clone https://github.com/mishtak00/conker
+```
+Get inside the conker directory and install requirements:
+```
+cd conker
+pip install -r requirements.txt
 ```
 
 ### Calibration
 ```
-python calibrate.py random0_DR12v5_CMASS_South.fits
+python calibrate.py random0_DR12v5_CMASS_South.fits --scan 60 140
+```
+
+### Help
+Get all available cmd line arguments with explanations:
+```
+python driver.py --help
 ```
 
 ### Rules on input and randoms catalogs
