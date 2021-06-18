@@ -352,6 +352,10 @@ class Correlator:
 			W, B = self._correlate()
 			# TODO: save W,B at each step
 			self.corrfunc[s - self.calib] = W / B
+			np.save(self.savename + '{}pcf_W_r1_{}.npy'\
+				.format(self.order, s), W)
+			np.save(self.savename + '{}pcf_B_r1_{}.npy'\
+				.format(self.order, s), B)
 
 		self._save_scan(scan_args)
 		if self.type_spatial == 'iso':
