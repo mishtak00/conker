@@ -61,7 +61,7 @@ class Parser(ArgumentParser):
 			help='Name of .npy file containing premade randoms backround grid.')
 		self.add_argument('-wR', '--wtd_randoms', action='store_true',
 			help='Randoms catalog will be interpreted as having weights on 4th col.')
-		self.add_argument('--dont_factorize_randoms', action='store_true',
+		self.add_argument('--factorize_randoms', action='store_true',
 			help='Randoms will just be histogrammed from the randoms catalog.')
 		
 		# these define 1st kernel behavior
@@ -134,10 +134,10 @@ class CalibrationParser(ArgumentParser):
 
 		super().__init__()
 		self.add_argument('fileR', metavar='RANDOMS_FILE', type=str,
-			help='Name of .fits catalog in \'data\' with randoms to be'\
+			help='Name of .fits catalog in \'data\' with randoms to be '\
 			'used in the calibration procedure.')
 		self.add_argument('--scan', nargs=2, type=float,
-			help='Calibrate over given separation range.'\
+			help='Calibrate over given separation range. '\
 			'1st arg inclusive, 2nd arg exclusive.')
 
 

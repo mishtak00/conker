@@ -66,7 +66,7 @@ def main():
 	fileR = args.file1 if not args.randoms_file else args.randoms_file
 	cfR = CenterFinder(fileR, args.wtd_randoms,
 		args.params_file, args.save, args.verbose,
-		dont_factorize=args.dont_factorize_randoms)
+		factorize=args.factorize_randoms)
 	corr.set_cfR(cfR)
 	# creates and customizes instance of CenterFinder object 0
 	file0 = args.file1 if not args.file0 else args.file0
@@ -98,9 +98,9 @@ def main():
 	# runs requested correlation and saves output
 	# scan command overrides single command
 	if args.scan:
-		if args.order == 2 or (args.order>2 and not args.noniso):
+		if args.order == 2 or (args.order>2 and not args.nondiag):
 			corr.scan_correlate_diag(args.scan)
-		elif args.order > 2 and args.noniso:
+		elif args.order > 2 and args.nondiag:
 			corr.scan_correlate_nondiag(args.scan)
 	else:
 		# TODO: integrate higher orders with args from -r1

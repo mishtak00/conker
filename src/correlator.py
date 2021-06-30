@@ -440,13 +440,25 @@ class Correlator:
 		self._recurse_dimensions_correlate(steps_calib, [], hyperarr_idx_levels, 0, 0)
 		end = time.time()
 		print(f'\nCorrelation everywhere took time: {end-start} seconds\n')
-
 		if self.printout:
 			print('Shape of complete correlation function:', self.corrfunc_hyperarr.shape)
-		np.save(self.savename + '{}pcf_nondiag_edges_range_{}_{}.npy'\
+
+		np.round(self.corrfunc_hyperarr, decimals=self.cf1.rounding_precision)
+
+		# TODO: flip the hyperarrays across all symmetry lines 
+		# to fill up the whole corrfunc for arbitrary order
+		if self.order==3:
+			full = self.corrfunc_hyperarr + self.corrfunc_hyperarr.T
+			for i in range(len(steps_calib)):
+				full[i,i] = self.corrfunc_hyperarr[i,i]
+			self.corrfunc_hyperarr = full
+
+		np.save(self.savename + '{}pcf_nondiag_1dbins_range_{}_{}.npy'\
 			.format(self.order, losep, hisep), steps_calib)
-		np.save(self.savename + '{}pcf_nondiag_corr_range_{}_{}.npy'\
+		np.save(self.savename + '{}pcf_nondiag_corrfunc_range_{}_{}.npy'\
 			.format(self.order, losep, hisep), self.corrfunc_hyperarr)
+
+
 
 
 	def load_calib(self):

@@ -41,7 +41,7 @@ class CenterFinder:
 		kernel_type: str = 'step', 
 		kernel_args: list = [], 
 		vote_threshold: float = -inf,
-		dont_factorize: bool = False,
+		factorize: bool = False,
 		):
 
 		self.kernel_radius = kernel_radius
@@ -50,7 +50,7 @@ class CenterFinder:
 		self.show_kernel = False
 		self.vote_threshold = vote_threshold
 		self.weighted = wtd
-		self.factorize_randoms = not dont_factorize
+		self.factorize_randoms = factorize
 
 		self.printout = printout
 		self.filename = remove_ext(galaxy_file)
