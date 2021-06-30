@@ -5,7 +5,7 @@
 ### Setup
 Clone this repository to your local machine:
 ```
-git clone https://github.com/mishtak00/conker
+git clone https://github.com/mishtak00/conker.git
 ```
 Get inside the conker directory and install requirements:
 ```
