@@ -40,7 +40,8 @@ class CenterFinder:
 		kernel_radius: float = 110., 
 		kernel_type: str = 'step', 
 		kernel_args: list = [], 
-		vote_threshold: float = -inf
+		vote_threshold: float = -inf,
+		dont_factorize: bool = False,
 		):
 
 		self.kernel_radius = kernel_radius
@@ -49,6 +50,7 @@ class CenterFinder:
 		self.show_kernel = False
 		self.vote_threshold = vote_threshold
 		self.weighted = wtd
+		self.factorize_randoms = not dont_factorize
 
 		self.printout = printout
 		self.filename = remove_ext(galaxy_file)
@@ -198,10 +200,13 @@ class CenterFinder:
 
 	def make_randoms_grid(self):
 		if not self.randoms_grid:
-			self.randoms_grid = self._project_and_sample(
-				self.density_grid, 
-				self.density_grid_edges
-				)
+			if self.factorize_randoms:
+				self.randoms_grid = self._project_and_sample(
+					self.density_grid, 
+					self.density_grid_edges
+					)
+			else:
+				self.randoms_grid = self.density_grid
 
 
 	def make_density_grid(self, dencon, overden):

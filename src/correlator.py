@@ -15,7 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses.
 """
 
-import sys
+import sys, time
 import numpy as np
 import matplotlib.pyplot as plt
 from .centerfinder import CenterFinder
@@ -33,7 +33,7 @@ class Correlator:
 		file0: str = None,
 		fileR: str = None,
 		file_gridR: str = None,
-		noniso: bool = False,
+		nondiag: bool = False,
 		params_file: str = 'params.json',
 		save: bool = False,
 		save_randoms = False,
@@ -46,6 +46,13 @@ class Correlator:
 		except AssertionError:
 			print('AssertionError: '\
 				f'Correlation order has to be >= 2, was given {order}')
+			sys.exit(1)
+
+		try:
+			assert not ((order == 2) and nondiag)
+		except AssertionError:
+			print('AssertionError: '\
+				f'Can\'t have a nondiagonal correlation of order 2')
 			sys.exit(1)
 
 		self.order = order
@@ -61,9 +68,9 @@ class Correlator:
 		# loads randoms grid from file
 		self.file_gridR = file_gridR
 
-		self.type_spatial = 'iso'
-		if noniso:
-			self.type_spatial = 'noniso'
+		self.func_type = 'diag'
+		if nondiag:
+			self.func_type = 'nondiag'
 
 		# default calibration reference
 		# this just serves as a default
@@ -256,10 +263,16 @@ class Correlator:
 		return W1_prod, B1_prod
 
 
-	def _correlate(self):
+	def _make_W1_B1(self):
 		self.cf1.make_convolved_grids()
 		W1 = self.cf1.get_centers_grid()
 		B1 = self.cf1.get_background_grid()
+
+		return W1, B1
+
+
+	def _correlate_diag(self):
+		W1, B1 = self._make_W1_B1()
 		W = self.W0 * W1 ** (self.order - 1)
 		B = self.B0 * B1 ** (self.order - 1)
 		if self.save:
@@ -276,9 +289,54 @@ class Correlator:
 		return W, B
 
 
+	@staticmethod
+	def _multistep_product_from_dict(dict, steps_list):
+		product = 1
+		for s in steps_list:
+			product *= dict[s]
+		return product
+
+
+	@staticmethod
+	def _steps_list_to_idx_tuple(steps, steps_list):
+		return tuple((np.argwhere(steps==s)[0,0] for s in steps_list))
+
+
+	def _recurse_dimensions_correlate(self, 
+		steps,
+		running_steps_list,
+		maxdims,
+		currdim, 
+		loopidx_start):
+
+		# ready to fill cell in W_hyperarr and B_hyperarr
+		if currdim == maxdims:
+			steps_idx_list = Correlator._steps_list_to_idx_tuple(steps, running_steps_list)
+			print('Current separations and their idxs:\t{}\t{}'\
+				.format(running_steps_list, steps_idx_list))
+			W = np.sum(self.W0 * 
+				Correlator._multistep_product_from_dict(
+					self.W1_dict, running_steps_list))
+			B = np.sum(self.B0 * 
+				Correlator._multistep_product_from_dict(
+					self.B1_dict, running_steps_list))
+			self.corrfunc_hyperarr[steps_idx_list] = W / B
+
+		# recurses to further dimensions
+		else:
+			for i, s in enumerate(steps[loopidx_start:]):
+				new_running_steps_list = running_steps_list + [s]
+				self._recurse_dimensions_correlate(
+					steps,
+					new_running_steps_list,
+					maxdims,
+					currdim+1,
+					i)
+
+
 	def save_single(self):
-		separation = list(self.corrfunc.keys())
-		correlation = list(self.corrfunc.values())
+		separation = np.array(list(self.corrfunc.keys()))
+		correlation = np.array(list(self.corrfunc.values()))
 		if self.printout:
 			print('Separation value:\n', separation)
 			print('Correlation value:\n', correlation)
@@ -291,15 +349,15 @@ class Correlator:
 	def single_correlate(self):
 		s = self.cf1.kernel_radius
 		self.corrfunc = {s: None}
-		W, B = self._correlate()
+		W, B = self._correlate_diag()
 		self.corrfunc[s - self.calib] = W / B
 		self.save_single()
 
 
 	def _save_scan(self, scan_args):
 		losep, hisep = scan_args
-		separation = list(self.corrfunc.keys())
-		correlation = list(self.corrfunc.values())
+		separation = np.array(list(self.corrfunc.keys()))
+		correlation = np.array(list(self.corrfunc.values()))
 		if self.printout:
 			print('Separation array:\n', separation)
 			print('Correlation array:\n', correlation)
@@ -329,19 +387,12 @@ class Correlator:
 		plt.grid(linestyle=':')
 		plt.legend()
 
-		plt.savefig('plots/' + \
-			'{}pcf_scan_{}_{}_{}.png'\
-			.format(
-				self.order, 
-				separation[0], 
-				separation[-1],
-				remove_ext(self.file1)
-				), 
-			dpi=300
-			)
+		plt.savefig('plots/' + '{}pcf_scan_{}_{}_{}.png'\
+			.format(self.order, losep, hisep, remove_ext(self.file1)), 
+			dpi=300)
 
 
-	def scan_correlate(self, scan_args):
+	def scan_correlate_diag(self, scan_args):
 		start, end = scan_args
 		step = self.cf1.grid_spacing
 		steps = np.arange(start, end+step, step)
@@ -349,8 +400,7 @@ class Correlator:
 
 		for s in steps:
 			self.cf1.set_kernel_radius(s)
-			W, B = self._correlate()
-			# TODO: save W,B at each step
+			W, B = self._correlate_diag()
 			self.corrfunc[s - self.calib] = W / B
 			np.save(self.savename + '{}pcf_W_r1_{}.npy'\
 				.format(self.order, s), W)
@@ -358,13 +408,50 @@ class Correlator:
 				.format(self.order, s), B)
 
 		self._save_scan(scan_args)
-		if self.type_spatial == 'iso':
+		if self.func_type == 'diag':
 			self._save_plot(scan_args)
+
+
+	def scan_correlate_nondiag(self, scan_args):
+		losep, hisep = scan_args
+		step = self.cf1.grid_spacing
+		steps = np.arange(losep, hisep+step, step)
+		steps_calib = steps - self.calib
+		self.W1_dict, self.B1_dict = {}, {}	# TODO: instantiate these in constructor
+
+		if self.printout:
+			print('\n\n\nStarting correlation along main diagonal...\n')
+		start = time.time()
+		# TODO: chunk this up to store just neighborhoods as it fills upwards in s
+		# fills up W1_dict and B1_dict for each step
+		for s in steps_calib:
+			self.cf1.set_kernel_radius(s)
+			self.W1_dict[s], self.B1_dict[s] = self._make_W1_B1()
+		end = time.time()
+		print(f'\nCorrelation on main diagonal took time: {end-start} seconds\n')
+
+		if self.printout:
+			print('\n\n\nCalculating correlation everywhere...\n')
+		start = time.time()
+		# fills up hyperarray sparsely
+		hyperarr_idx_levels = self.order - 1
+		hyperarr_shape = steps.shape * hyperarr_idx_levels
+		self.corrfunc_hyperarr = np.empty(hyperarr_shape)
+		self._recurse_dimensions_correlate(steps_calib, [], hyperarr_idx_levels, 0, 0)
+		end = time.time()
+		print(f'\nCorrelation everywhere took time: {end-start} seconds\n')
+
+		if self.printout:
+			print('Shape of complete correlation function:', self.corrfunc_hyperarr.shape)
+		np.save(self.savename + '{}pcf_nondiag_edges_range_{}_{}.npy'\
+			.format(self.order, losep, hisep), steps_calib)
+		np.save(self.savename + '{}pcf_nondiag_corr_range_{}_{}.npy'\
+			.format(self.order, losep, hisep), self.corrfunc_hyperarr)
 
 
 	def load_calib(self):
 		if self.printout:
-			print('Loading calibration data...')
+			print('\n\n\nLoading calibration data...\n')
 
 		try:
 			if self.fileR:

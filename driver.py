@@ -58,14 +58,15 @@ def main():
 	# sets up correlator object for run
 	corr = Correlator(args.order, args.file1, file0=args.file0,
 		fileR=args.randoms_file, file_gridR=args.randoms_grid, 
-		noniso=args.noniso, save_randoms=args.save_randoms,
+		nondiag=args.nondiag, save_randoms=args.save_randoms,
 		params_file=args.params_file, printout=args.verbose,
 		save=args.save, savename=savename)
 
 	# creates and puts cf object instance for randoms (non-conv background)
 	fileR = args.file1 if not args.randoms_file else args.randoms_file
 	cfR = CenterFinder(fileR, args.wtd_randoms,
-		args.params_file, args.save, args.verbose)
+		args.params_file, args.save, args.verbose,
+		dont_factorize=args.dont_factorize_randoms)
 	corr.set_cfR(cfR)
 	# creates and customizes instance of CenterFinder object 0
 	file0 = args.file1 if not args.file0 else args.file0
@@ -97,9 +98,12 @@ def main():
 	# runs requested correlation and saves output
 	# scan command overrides single command
 	if args.scan:
-		corr.scan_correlate(args.scan)
-
+		if args.order == 2 or (args.order>2 and not args.noniso):
+			corr.scan_correlate_diag(args.scan)
+		elif args.order > 2 and args.noniso:
+			corr.scan_correlate_nondiag(args.scan)
 	else:
+		# TODO: integrate higher orders with args from -r1
 		corr.single_correlate()
 
 
