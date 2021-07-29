@@ -320,6 +320,7 @@ class Correlator:
 			B = np.sum(self.B0 * 
 				Correlator._multistep_product_from_dict(
 					self.B1_dict, running_steps_list))
+			# TODO: save W and B as an array and do the ratio only in the end
 			self.corrfunc_hyperarr[steps_idx_list] = W / B
 
 		# recurses to further dimensions
@@ -416,7 +417,7 @@ class Correlator:
 		losep, hisep = scan_args
 		step = self.cf1.grid_spacing
 		steps = np.arange(losep, hisep+step, step)
-		steps_calib = steps - self.calib
+		steps_calib = steps - self.calib # TODO: maybe the index error comes from here?
 		self.W1_dict, self.B1_dict = {}, {}	# TODO: instantiate these in constructor
 
 		if self.printout:
